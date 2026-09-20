@@ -97,10 +97,10 @@ Pro_Seis_WASW::Pro_Seis_WASW(QWidget* parent)
     ui->setupUi(this);
 
     this->setWindowTitle(QStringLiteral("SeisTool-WASW 面波频散分析系统 v1.0"));
-    this->setMinimumSize(800, 600);
+    this->setMinimumSize(1100,680);
     this->setStyleSheet(StyleHelper::getDarkScientificStyle());
     setWindowIcon(QIcon(":/Pro_Seis_WASW/icon/layer.png"));
-    resize(800, 600);
+    resize(1366,800);
 
     createActionsAndToolBars(); // 建立工具栏和打开按钮
     initUI();
@@ -412,14 +412,14 @@ void Pro_Seis_WASW::initControlDock()
 
     spinDt = new QDoubleSpinBox(geomGroup);
     spinDt->setRange(0.001, 100.0);
-    spinDt->setValue(0.5);      // 默认 0.5 ms (对应你的 MATLAB 数据)
+    spinDt->setValue(1);      // 默认 0.5 ms (对应你的 MATLAB 数据)
     spinDt->setDecimals(3);
     spinDt->setSuffix(" ms");
     spinDt->setToolTip(QStringLiteral("时间采样率 dt，打开 SEGY 时会自动从道头读取"));
 
     spinDx = new QDoubleSpinBox(geomGroup);
     spinDx->setRange(0.01, 500.0);
-    spinDx->setValue(0.2);      // 对应你的 MATLAB 数据 trece_offset = 0.2
+    spinDx->setValue(1);      // 对应你的 MATLAB 数据 trece_offset = 0.2
     spinDx->setDecimals(2);
     spinDx->setSuffix(" m");
 
@@ -454,12 +454,12 @@ void Pro_Seis_WASW::initControlDock()
 
     spinVmin = new QDoubleSpinBox(scanGroup);
     spinVmin->setRange(10.0, 5000.0);
-    spinVmin->setValue(100.0);  // 对应你的 MATLAB: 100 m/s
+    spinVmin->setValue(400.0);  // 对应你的 MATLAB: 100 m/s
     spinVmin->setSuffix(" m/s");
 
     spinVmax = new QDoubleSpinBox(scanGroup);
     spinVmax->setRange(50.0, 8000.0);
-    spinVmax->setValue(700.0);  // 对应你的 MATLAB: 700 m/s
+    spinVmax->setValue(1000.0);  // 对应你的 MATLAB: 700 m/s
     spinVmax->setSuffix(" m/s");
 
     comboGridQuality = new QComboBox(scanGroup);
