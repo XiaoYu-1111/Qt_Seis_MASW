@@ -11,10 +11,11 @@
 
 **SeisTool-WASW** 是一款面向近地表地球物理工程勘察的专业面波频散分析系统（MASW，Multichannel Analysis of Surface Waves）。系统集成了高精度地震数据读取、多模式道集可视化、多核并行频散能量谱计算、交互式局部极大值吸附拾取以及出版级科研图表成图功能。
 
-### 1
+### 输入数据
 ![Dashboard Screenshot](Pro_image/main1.png)
-### 2
+### 频散能量图
 ![Dashboard Screenshot](Pro_image/main2.png)
+### 频散曲线
 ![Dashboard Screenshot](Pro_image/main3.png)
 ---
 
