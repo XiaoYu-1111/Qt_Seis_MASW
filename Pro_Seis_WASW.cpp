@@ -251,7 +251,13 @@ void Pro_Seis_WASW::initMainTabs()
                 plotDispersion->savePng(fileName, 0, 0, 2.0, 100);
             }
             });
+        // =========================================================
+        // --- 动作 3: 新增【导出为 SEGY 数据】---
+        // =========================================================
+        QAction* actExportSegy = menu.addAction(QStringLiteral("💾 导出频散能量谱为 SEGY (*.sgy)..."));
+        connect(actExportSegy, &QAction::triggered, this, &Pro_Seis_WASW::exportDispersionToSegy);
 
+        menu.exec(plotDispersion->mapToGlobal(pos));
         // 在鼠标点击处弹出菜单
         menu.exec(plotDispersion->mapToGlobal(pos));
         });
@@ -893,4 +899,97 @@ void Pro_Seis_WASW::exportPickedCurve()
     textLog->append(QStringLiteral("[%1] 频散曲线已成功导出: 共 %2 个点至文件 %3")
         .arg(QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss")))
         .arg(m_pickedPoints.size()).arg(fileName));
+}
+
+
+
+void Pro_Seis_WASW::exportDispersionToSegy()
+{
+    // 1. 安全检查
+    if (m_rawDispersionEnergy.empty() || m_dispNf <= 0 || m_dispNv <= 0) {
+        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("当前暂无计算好的频散谱数据，请先计算！"));
+        return;
+    }
+
+    // 2. 获取用户保存路径
+    QString defaultName = QString("DispersionMap_F%1-%2Hz_V%3-%4_%5.sgy")
+        .arg((int)m_dispFmin).arg((int)m_dispFmax)
+        .arg((int)m_dispVmin).arg((int)m_dispVmax)
+        .arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss"));
+
+    QString fileName = QFileDialog::getSaveFileName(
+        this,
+        QStringLiteral("导出频散能量谱为 SEGY"),
+        defaultName,
+        QStringLiteral("SEGY 地震数据 (*.sgy *.segy);;所有文件 (*.*)")
+    );
+
+    if (fileName.isEmpty()) return;
+
+    // 3. 获取当前界面的归一化数据
+    auto processedEnergy = m_rawDispersionEnergy;
+    int mode = comboNormMode ? comboNormMode->currentIndex() : 0;
+
+    if (mode == 0) {
+        // 按频率（每列）归一化
+        for (int fi = 0; fi < m_dispNf; ++fi) {
+            float colMax = 0.0f;
+            for (int vi = 0; vi < m_dispNv; ++vi) {
+                colMax = std::max(colMax, processedEnergy[vi][fi]);
+            }
+            if (colMax > 1e-6f) {
+                for (int vi = 0; vi < m_dispNv; ++vi) {
+                    processedEnergy[vi][fi] /= colMax;
+                }
+            }
+        }
+    }
+    else {
+        // 全局归一化
+        // 1. 寻找全图最大值 (双层循环)
+        float globalMax = 0.0f;
+        for (int vi = 0; vi < m_dispNv; ++vi) {
+            for (int fi = 0; fi < m_dispNf; ++fi) {
+                globalMax = std::max(globalMax, processedEnergy[vi][fi]);
+            }
+        }
+
+        // 2. 将全图所有元素除以 globalMax (同样需要双层循环！)
+        if (globalMax > 1e-6f) {
+            for (int vi = 0; vi < m_dispNv; ++vi) {
+                for (int fi = 0; fi < m_dispNf; ++fi) { // <--- 补上这层内循环
+                    processedEnergy[vi][fi] /= globalMax;
+                }
+            }
+        }
+    }
+
+    // =========================================================
+    // 4. 矩阵转置：构建 SEGY 格式标准布局
+    // 目标布局：[Nf 道][Nv 采样点]
+    // 这样在任何地震软件中打开，横轴自动为频率，纵轴自动为相速度
+    // =========================================================
+    std::vector<std::vector<float>> segyData(m_dispNf, std::vector<float>(m_dispNv, 0.0f));
+    for (int fi = 0; fi < m_dispNf; ++fi) {
+        for (int vi = 0; vi < m_dispNv; ++vi) {
+            segyData[fi][vi] = processedEnergy[vi][fi];
+        }
+    }
+
+    // 计算速度等效采样间隔 (s)，作为 SEGY 头的 dt 记录
+    float dv = (m_dispVmax - m_dispVmin) / std::max(1, m_dispNv - 1);
+    float dt_equivalent = dv / 1000.0f; // 缩放保存，防止数值溢出
+
+    // 5. 调用已有 SeismicIO 写入
+    SeismicIO::writeSegyFile2D(segyData, fileName.toStdString(), dt_equivalent);
+
+    // 6. 日志与弹窗提示
+    QString logMsg = QStringLiteral("[%1] 频散能量谱已成功导出为 SEGY: 总道数(频率)=%2, 每道采样点(速度)=%3 -> %4")
+        .arg(QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss")))
+        .arg(m_dispNf).arg(m_dispNv).arg(fileName);
+
+    textLog->append(logMsg);
+    QMessageBox::information(this, QStringLiteral("导出成功"),
+        QStringLiteral("频散能量谱已成功导出为标准 SEGY 文件！\n\n- 总道数 (频率点): %1\n- 每道点数 (速度点): %2\n- 速度范围: %3 ~ %4 m/s\n- 频率范围: %5 ~ %6 Hz")
+        .arg(m_dispNf).arg(m_dispNv).arg(m_dispVmin).arg(m_dispVmax).arg(m_dispFmin).arg(m_dispFmax));
 }

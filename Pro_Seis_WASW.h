@@ -109,4 +109,7 @@ private:
     void onDispersionPlotClicked(QMouseEvent* event); // 点击吸附算法
     void updatePickVisuals();                         // 同步刷新 Tab2 与 Tab3 视图
     void exportPickedCurve();                          // 导出数据文件
+
+    // 在 Pro_Seis_WASW.h 中增加：
+    void exportDispersionToSegy(); // 导出频散谱为 SEGY 格式
 };

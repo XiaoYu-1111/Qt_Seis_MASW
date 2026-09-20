@@ -27,6 +27,9 @@
     <Filter Include="Pro_cpp">
       <UniqueIdentifier>{73ebe7dd-cecc-4edf-80c0-3d17ed72fe91}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Python_script">
+      <UniqueIdentifier>{e5c167e2-baca-4287-814e-602f2e689519}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <QtRcc Include="Pro_Seis_WASW.qrc">
@@ -89,5 +92,13 @@
     <ClInclude Include="Pro_h\SignalProcessingUtils.h">
       <Filter>Pro_h</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Python_script\01_plot_seismic_gather.py">
+      <Filter>Python_script</Filter>
+    </None>
+    <None Include="Python_script\02_plot_dispersion_map.py">
+      <Filter>Python_script</Filter>
+    </None>
   </ItemGroup>
 </Project>
