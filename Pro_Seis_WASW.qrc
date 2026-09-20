@@ -1,0 +1,7 @@
+<RCC>
+    <qresource prefix="/Pro_Seis_WASW">
+        <file>icon/data.png</file>
+        <file>icon/layer.png</file>
+        <file>icon/main.ico</file>
+    </qresource>
+</RCC>
