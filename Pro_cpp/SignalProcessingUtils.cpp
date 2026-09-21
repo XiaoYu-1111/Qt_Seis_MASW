@@ -745,7 +745,8 @@ std::vector<std::vector<std::complex<double>>> cwt_morlet_safe(
 	// 1. 补零至 2 的幂次，提高 FFT 效率与频率采样精度
 	int nfft = 1;
 	while (nfft < nt) nfft <<= 1;
-	if (nfft < 2048) nfft = 2048; // 保证频域分辨率
+	//if (nfft < 2048) nfft = 2048; // 保证频域分辨率
+	if (nfft < 8192) nfft = 8192; // <--- 从 2048 改为 8192
 
 	// 2. 对每一道做 FFT 并进行振幅归一化 P(x, w) = U(x, w) / |U(x, w)|
 	Eigen::FFT<double> fft;
@@ -782,18 +783,55 @@ std::vector<std::vector<std::complex<double>>> cwt_morlet_safe(
 	float df_scan = (f_max - f_min) / std::max(1, nf - 1);
 	float dv_scan = (v_max - v_min) / std::max(1, nv - 1);
 
-	// 4. 并行扫描 (f, v) 空间，执行空间相移叠加
+	// 4. 并行扫描 (f, v) 空间，执行空间相移叠加 (带频域复数线性插值)
 #pragma omp parallel for schedule(dynamic)
 	for (int fi = 0; fi < nf; ++fi) {
 		double cur_f = f_min + fi * df_scan;
 		if (cur_f <= 0.0) continue;
 
-		// 找到 FFT 频率点最近的索引
-		int k_fft = static_cast<int>(std::round(cur_f / df));
-		if (k_fft >= nFreqBins) k_fft = nFreqBins - 1;
+		// =========================================================
+		// 1. 计算浮点频率索引与相邻两点的插值权重
+		// =========================================================
+		double k_float = cur_f / df;
+		int k0 = static_cast<int>(std::floor(k_float));
+		int k1 = k0 + 1;
+		double alpha = k_float - k0; // 插值权重 (0.0 ~ 1.0)
+
+		// 边界越界保护
+		if (k0 < 0) {
+			k0 = 0;
+			k1 = 0;
+			alpha = 0.0;
+		}
+		else if (k1 >= nFreqBins) {
+			k0 = nFreqBins - 1;
+			k1 = nFreqBins - 1;
+			alpha = 0.0;
+		}
+
+		// =========================================================
+		// 2. 【核心优化】：在进入速度扫描前，先插值好当前频率所有道的复数谱
+		// =========================================================
+		std::vector<std::complex<double>> curNormSpectra(nTraces);
+		for (int tr = 0; tr < nTraces; ++tr) {
+			// 相邻两点线性加权插值
+			std::complex<double> val = (1.0 - alpha) * normSpectra[tr][k0] + alpha * normSpectra[tr][k1];
+
+			// 归一化为单位模长 (移相法标准：剔除振幅影响，仅保留纯相位)
+			double mag = std::abs(val);
+			if (mag > 1e-12) {
+				curNormSpectra[tr] = val / mag;
+			}
+			else {
+				curNormSpectra[tr] = std::complex<double>(0.0, 0.0);
+			}
+		}
 
 		double omega = 2.0 * PI * cur_f;
 
+		// =========================================================
+		// 3. 速度扫描与空间相移叠加
+		// =========================================================
 		for (int vi = 0; vi < nv; ++vi) {
 			double cur_v = v_min + vi * dv_scan;
 			if (cur_v <= 0.0) continue;
@@ -803,16 +841,17 @@ std::vector<std::vector<std::complex<double>>> cwt_morlet_safe(
 			std::complex<double> stackSum(0.0, 0.0);
 
 			for (int tr = 0; tr < nTraces; ++tr) {
-				double offset = x0 + tr * dx; // 真实偏移距 = 最小炮检距 + 道索引 * 道间距
+				double offset = x0 + tr * dx; // 真实偏移距
 				double phase = k_wave * offset;
 
 				// 相移因子 exp(i * k * x)
 				std::complex<double> shiftFactor(std::cos(phase), std::sin(phase));
 
-				stackSum += normSpectra[tr][k_fft] * shiftFactor;
+				// 直接使用插值好的平滑频谱 curNormSpectra
+				stackSum += curNormSpectra[tr] * shiftFactor;
 			}
 
-			// 计算叠加能量（取模）
+			// 计算叠加能量（取模并归一）
 			dispersionEnergy[vi][fi] = static_cast<float>(std::abs(stackSum) / nTraces);
 		}
 	}

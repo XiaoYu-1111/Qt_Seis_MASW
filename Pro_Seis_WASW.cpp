@@ -7,6 +7,7 @@
 #include "Pro_h/SeismicIO.h"
 #include "Pro_h/SeismicView2D.h"
 #include "Pro_h/SignalProcessingUtils.h"
+#include "Pro_h/RayleighForwardSolver.h"
 
 #include <QVBoxLayout>
 #include <QFormLayout>
@@ -239,7 +240,23 @@ void Pro_Seis_WASW::initMainTabs()
 
         menu.addSeparator();
 
-        // --- 动作 2: 导出当前频散谱高清图片 (Save PNG) ---
+        // =========================================================
+        // --- 动作 2: 新增【平滑插值 / 清晰色块】切换开关 ---
+        // =========================================================
+        QAction* actInterpolate = menu.addAction(QStringLiteral("平滑插值 (Smooth Blur)"));
+        actInterpolate->setCheckable(true);                  // 设为可勾选项
+        actInterpolate->setChecked(m_interpolateColorMap);   // 保持与当前状态同步
+        connect(actInterpolate, &QAction::toggled, this, [=](bool checked) {
+            m_interpolateColorMap = checked;
+            if (dispColorMap) {
+                dispColorMap->setInterpolate(checked);       // true: 开启模糊平滑，false: 纯净色块
+                plotDispersion->replot();
+            }
+            });
+
+        menu.addSeparator();
+
+        // --- 动作 3: 保存图片 ---
         QAction* actSave = menu.addAction(QStringLiteral("保存图片 (Export PNG)..."));
         connect(actSave, &QAction::triggered, this, [=]() {
             QString defaultName = QString("Dispersion_%1.png")
@@ -247,17 +264,14 @@ void Pro_Seis_WASW::initMainTabs()
             QString fileName = QFileDialog::getSaveFileName(
                 this, QStringLiteral("保存频散谱图像"), defaultName, QStringLiteral("PNG 图片 (*.png);;所有文件 (*.*)"));
             if (!fileName.isEmpty()) {
-                // scale=2.0 导出 2 倍高分辨率图片，线条文字极其清晰
                 plotDispersion->savePng(fileName, 0, 0, 2.0, 100);
             }
             });
-        // =========================================================
-        // --- 动作 3: 新增【导出为 SEGY 数据】---
-        // =========================================================
+
+        // --- 动作 4: 导出为 SEGY ---
         QAction* actExportSegy = menu.addAction(QStringLiteral("💾 导出频散能量谱为 SEGY (*.sgy)..."));
         connect(actExportSegy, &QAction::triggered, this, &Pro_Seis_WASW::exportDispersionToSegy);
 
-        menu.exec(plotDispersion->mapToGlobal(pos));
         // 在鼠标点击处弹出菜单
         menu.exec(plotDispersion->mapToGlobal(pos));
         });
@@ -402,99 +416,186 @@ void Pro_Seis_WASW::initMainTabs()
 
 void Pro_Seis_WASW::initControlDock()
 {
-    controlDock = new QDockWidget(QStringLiteral("参数控制面板"), this);
+    controlDock = new QDockWidget(QStringLiteral("控制面板"), this);
     controlDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
 
-    QWidget* dockContainer = new QWidget(controlDock);
-    QVBoxLayout* dockLayout = new QVBoxLayout(dockContainer);
-    dockLayout->setContentsMargins(10, 10, 10, 10);
-    dockLayout->setSpacing(10);
+    // 创建左侧 Tab 容器组件
+    QTabWidget* dockTabs = new QTabWidget(controlDock);
+    dockTabs->setTabPosition(QTabWidget::North);
 
-    // ==========================================
-    // 组 1: 采集与观测系统几何参数 (Geometry)
-    // ==========================================
-    QGroupBox* geomGroup = new QGroupBox(QStringLiteral("观测系统参数 (Geometry)"), dockContainer);
+    // =========================================================================
+    // 【页面 1】频散分析与实测处理 (Tab 1: Dispersion Analysis)
+    // =========================================================================
+    QWidget* pageDispersion = new QWidget(dockTabs);
+    QVBoxLayout* dispLayout = new QVBoxLayout(pageDispersion);
+    dispLayout->setContentsMargins(8, 8, 8, 8);
+    dispLayout->setSpacing(8);
+
+    // --- 组 1: 采集与观测系统几何参数 (Geometry) ---
+    QGroupBox* geomGroup = new QGroupBox(QStringLiteral("观测系统参数 (Geometry)"), pageDispersion);
     QFormLayout* geomLayout = new QFormLayout(geomGroup);
+    geomLayout->setSpacing(6);
 
     spinDt = new QDoubleSpinBox(geomGroup);
     spinDt->setRange(0.001, 100.0);
-    spinDt->setValue(1);      // 默认 0.5 ms (对应你的 MATLAB 数据)
+    spinDt->setValue(1.0);
     spinDt->setDecimals(3);
     spinDt->setSuffix(" ms");
     spinDt->setToolTip(QStringLiteral("时间采样率 dt，打开 SEGY 时会自动从道头读取"));
 
     spinDx = new QDoubleSpinBox(geomGroup);
     spinDx->setRange(0.01, 500.0);
-    spinDx->setValue(1);      // 对应你的 MATLAB 数据 trece_offset = 0.2
+    spinDx->setValue(1.0);
     spinDx->setDecimals(2);
     spinDx->setSuffix(" m");
 
     spinOffset0 = new QDoubleSpinBox(geomGroup);
     spinOffset0->setRange(0.0, 1000.0);
-    spinOffset0->setValue(0.0); // 最小炮检距
+    spinOffset0->setValue(10.0);
     spinOffset0->setSuffix(" m");
 
     geomLayout->addRow(QStringLiteral("采样间隔 (dt):"), spinDt);
     geomLayout->addRow(QStringLiteral("道间距 (dx):"), spinDx);
     geomLayout->addRow(QStringLiteral("最小炮检距 (x0):"), spinOffset0);
-    dockLayout->addWidget(geomGroup);
+    dispLayout->addWidget(geomGroup);
 
-    // ==========================================
-    // 组 2: 频散计算扫描网格 (Dispersion Grid)
-    // ==========================================
-    QGroupBox* scanGroup = new QGroupBox(QStringLiteral("频散扫描范围 (Scan Range)"), dockContainer);
+    // --- 组 2: 频散计算扫描网格 (Scan Range) ---
+    QGroupBox* scanGroup = new QGroupBox(QStringLiteral("频散扫描范围 (Scan Range)"), pageDispersion);
     QFormLayout* scanLayout = new QFormLayout(scanGroup);
+    scanLayout->setSpacing(6);
 
     comboMethod = new QComboBox(scanGroup);
     comboMethod->addItems({ QStringLiteral("移相法 (Phase Shift)"), QStringLiteral("F-K 变换法") });
 
+    comboGridQuality = new QComboBox(scanGroup);
+    comboGridQuality->addItem(QStringLiteral("快速预览 (100 × 100 - 极速)"), QPoint(100, 100));
+    comboGridQuality->addItem(QStringLiteral("标准质量 (180 × 250 - 推荐)"), QPoint(180, 250));
+    comboGridQuality->addItem(QStringLiteral("高精度 (300 × 500 - 精细)"), QPoint(300, 500));
+    comboGridQuality->setCurrentIndex(1); // 默认选择【标准质量】
+
     spinFmin = new QDoubleSpinBox(scanGroup);
     spinFmin->setRange(0.1, 500.0);
-    spinFmin->setValue(5.0);    // 对应你的 MATLAB: 5 Hz
+    spinFmin->setValue(5.0);
     spinFmin->setSuffix(" Hz");
 
     spinFreqMax = new QDoubleSpinBox(scanGroup);
     spinFreqMax->setRange(1.0, 1000.0);
-    spinFreqMax->setValue(80.0); // 对应你的 MATLAB: 80 Hz
+    spinFreqMax->setValue(30.0);
     spinFreqMax->setSuffix(" Hz");
 
     spinVmin = new QDoubleSpinBox(scanGroup);
     spinVmin->setRange(10.0, 5000.0);
-    spinVmin->setValue(400.0);  // 对应你的 MATLAB: 100 m/s
+    spinVmin->setValue(200.0);
     spinVmin->setSuffix(" m/s");
 
     spinVmax = new QDoubleSpinBox(scanGroup);
     spinVmax->setRange(50.0, 8000.0);
-    spinVmax->setValue(1000.0);  // 对应你的 MATLAB: 700 m/s
+    spinVmax->setValue(800.0);
     spinVmax->setSuffix(" m/s");
 
-    comboGridQuality = new QComboBox(scanGroup);
-    // 使用 QPoint(nf, nv) 作为 Item 的关联数据，x 存 nf，y 存 nv
-    comboGridQuality->addItem(QStringLiteral("快速预览 (100 × 100 - 极速)"), QPoint(100, 100));
-    comboGridQuality->addItem(QStringLiteral("标准质量 (180 × 250 - 推荐)"), QPoint(180, 250));
-    comboGridQuality->addItem(QStringLiteral("高精度 (300 × 500 - 精细)"), QPoint(300, 500));
-
-    // 默认选择【标准质量】
-    comboGridQuality->setCurrentIndex(1);
-
-    // 将控件加入布局（建议放在分析方法下方）
     scanLayout->addRow(QStringLiteral("计算方法:"), comboMethod);
-    scanLayout->addRow(QStringLiteral("网格质量:"), comboGridQuality); // <--- 新增此行
+    scanLayout->addRow(QStringLiteral("网格质量:"), comboGridQuality);
     scanLayout->addRow(QStringLiteral("频率下限 (Fmin):"), spinFmin);
     scanLayout->addRow(QStringLiteral("频率上限 (Fmax):"), spinFreqMax);
     scanLayout->addRow(QStringLiteral("速度下限 (Vmin):"), spinVmin);
     scanLayout->addRow(QStringLiteral("速度上限 (Vmax):"), spinVmax);
-    dockLayout->addWidget(scanGroup);
+    dispLayout->addWidget(scanGroup);
 
-    // 计算执行按钮
-    btnCalculate = new QPushButton(QStringLiteral("开始计算频散谱"), dockContainer);
+    // --- 开始计算按钮 ---
+    btnCalculate = new QPushButton(QStringLiteral("🚀 开始计算频散谱"), pageDispersion);
     btnCalculate->setObjectName("btnPrimary");
-    btnCalculate->setMinimumHeight(40);
+    btnCalculate->setMinimumHeight(38);
     connect(btnCalculate, &QPushButton::clicked, this, &Pro_Seis_WASW::onCalculateClicked);
-    dockLayout->addWidget(btnCalculate);
+    dispLayout->addWidget(btnCalculate);
 
-    dockLayout->addStretch();
-    controlDock->setWidget(dockContainer);
+    dispLayout->addStretch(); // 将控件往顶部压缩，防止变形
+
+
+    // =========================================================================
+    // 【页面 2】理论正演模拟 (Tab 2: Theoretical Synthesis)
+    // =========================================================================
+    QWidget* pageSynthetic = new QWidget(dockTabs);
+    QVBoxLayout* synthLayout = new QVBoxLayout(pageSynthetic);
+    synthLayout->setContentsMargins(8, 8, 8, 8);
+    synthLayout->setSpacing(8);
+
+    // --- 理论地质模型参数 (1D Model) ---
+   // 找到 initControlDock() 中的【页面 2】理论正演模拟部分，替换 modelGroup：
+
+    QGroupBox* modelGroup = new QGroupBox(QStringLiteral("三层地质模型参数 (3-Layer Model)"), pageSynthetic);
+    QFormLayout* modelLayout = new QFormLayout(modelGroup);
+    modelLayout->setSpacing(6);
+
+    // --- 第 1 层 ---
+    spinLayerH1 = new QDoubleSpinBox(modelGroup);
+    spinLayerH1->setRange(0.5, 100.0);
+    spinLayerH1->setValue(20.0); // 浅表层厚度 5m
+    spinLayerH1->setSuffix(" m");
+
+    spinLayerVs1 = new QDoubleSpinBox(modelGroup);
+    spinLayerVs1->setRange(50.0, 2000.0);
+    spinLayerVs1->setValue(300.0); // 表层横波 300 m/s
+    spinLayerVs1->setSuffix(" m/s");
+
+    // --- 第 2 层 ---
+    spinLayerH2 = new QDoubleSpinBox(modelGroup);
+    spinLayerH2->setRange(0.5, 200.0);
+    spinLayerH2->setValue(100.0); // 中间层厚度 100m
+    spinLayerH2->setSuffix(" m");
+
+    spinLayerVs2 = new QDoubleSpinBox(modelGroup);
+    spinLayerVs2->setRange(50.0, 3000.0);
+    spinLayerVs2->setValue(600.0); // 中间层横波 600 m/s
+    spinLayerVs2->setSuffix(" m/s");
+
+    // --- 第 3 层 (基底) ---
+    spinLayerVs3 = new QDoubleSpinBox(modelGroup);
+    spinLayerVs3->setRange(100.0, 5000.0);
+    spinLayerVs3->setValue(600.0); // 基底基岩横波 600 m/s
+    spinLayerVs3->setSuffix(" m/s");
+
+    // --- 子波主频 ---
+    spinWaveletFm = new QDoubleSpinBox(modelGroup);
+    spinWaveletFm->setRange(1.0, 200.0);
+    spinWaveletFm->setValue(12.0); // 主频 12 Hz
+    spinWaveletFm->setSuffix(" Hz");
+
+    modelLayout->addRow(QStringLiteral("第 1 层厚度 (H1):"), spinLayerH1);
+    modelLayout->addRow(QStringLiteral("第 1 层横波 (Vs1):"), spinLayerVs1);
+    modelLayout->addRow(QStringLiteral("第 2 层厚度 (H2):"), spinLayerH2);
+    modelLayout->addRow(QStringLiteral("第 2 层横波 (Vs2):"), spinLayerVs2);
+    modelLayout->addRow(QStringLiteral("第 3 层基底 (Vs3):"), spinLayerVs3);
+    modelLayout->addRow(QStringLiteral("雷克子波主频:"), spinWaveletFm);
+    synthLayout->addWidget(modelGroup);
+
+    // --- 一键合成理论面波记录按钮 ---
+    QPushButton* btnSynthetic = new QPushButton(QStringLiteral("🧪 一键合成理论面波记录"), pageSynthetic);
+    btnSynthetic->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #059669;"
+        "   border: 1px solid #047857;"
+        "   color: white;"
+        "   font-weight: bold;"
+        "   border-radius: 4px;"
+        "   padding: 6px 12px;"
+        "   min-height: 28px;"
+        "}"
+        "QPushButton:hover { background-color: #047857; }"
+        "QPushButton:pressed { background-color: #065f46; }"
+    );
+    connect(btnSynthetic, &QPushButton::clicked, this, &Pro_Seis_WASW::onSyntheticClicked);
+    synthLayout->addWidget(btnSynthetic);
+
+    synthLayout->addStretch(); // 弹性占位
+
+
+    // =========================================================================
+    // 装配 Tab 页面到 DockWidget
+    // =========================================================================
+    dockTabs->addTab(pageDispersion, QStringLiteral("📊 频散分析"));
+    dockTabs->addTab(pageSynthetic, QStringLiteral("🧪 理论正演"));
+
+    controlDock->setWidget(dockTabs);
     addDockWidget(Qt::LeftDockWidgetArea, controlDock);
 }
 
@@ -711,7 +812,7 @@ void Pro_Seis_WASW::renderDispersionMap()
     dispColorMap->setColorScale(dispColorScale);
     dispColorMap->setDataRange(QCPRange(0.0, 1.0));
     dispColorScale->setDataRange(QCPRange(0.0, 1.0));
-    dispColorMap->setInterpolate(true);
+    dispColorMap->setInterpolate(m_interpolateColorMap);
 
     // 刷新色标渐变并重绘
     updateDispersionColormap();
@@ -902,7 +1003,6 @@ void Pro_Seis_WASW::exportPickedCurve()
 }
 
 
-
 void Pro_Seis_WASW::exportDispersionToSegy()
 {
     // 1. 安全检查
@@ -992,4 +1092,75 @@ void Pro_Seis_WASW::exportDispersionToSegy()
     QMessageBox::information(this, QStringLiteral("导出成功"),
         QStringLiteral("频散能量谱已成功导出为标准 SEGY 文件！\n\n- 总道数 (频率点): %1\n- 每道点数 (速度点): %2\n- 速度范围: %3 ~ %4 m/s\n- 频率范围: %5 ~ %6 Hz")
         .arg(m_dispNf).arg(m_dispNv).arg(m_dispVmin).arg(m_dispVmax).arg(m_dispFmin).arg(m_dispFmax));
+}
+
+void Pro_Seis_WASW::onSyntheticClicked()
+{
+    // 1. 动态从面板读取三层地质模型参数
+    double h1 = spinLayerH1->value();
+    double vs1 = spinLayerVs1->value();
+    double h2 = spinLayerH2->value();
+    double vs2 = spinLayerVs2->value();
+    double vs3 = spinLayerVs3->value();
+    double fm = spinWaveletFm->value();
+
+    // 2. 组装三层介质物理模型
+    LayerModel model;
+    model.H = { h1, h2 };                     // 2 个层厚参数 (最后一层为无限半空间)
+    model.VS = { vs1, vs2, vs3 };              // 3 层横波速度
+    model.VP = { vs1 * 2.0, vs2 * 2.0, vs3 * 2.0 }; // 标称泊松介质 Vp = 2*Vs
+    model.Rho = { 1800.0, 2000.0, 2200.0 };     // 各层密度 (递增)
+
+    // 3. 读取几何与频率范围
+    double dt = spinDt->value() / 1000.0;
+    double dx = spinDx->value();
+    double x0 = spinOffset0->value();
+    double fmin = spinFmin->value();
+    double fmax = spinFreqMax->value();
+
+    // 采样频率序列 (步长 0.25 Hz，更密集的频点可以让三层频散拐折更平滑)
+    std::vector<double> freqs;
+    for (double f = fmin; f <= fmax; f += 0.25) freqs.push_back(f);
+
+    textLog->append(QStringLiteral("[%1] 正在进行三层介质面波理论正演求解...")
+        .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+
+    // 4. 计算理论相速度曲线 (自动处理三层模型)
+    auto theoVel = RayleighForwardSolver::calcBaseDispersion(freqs, model);
+
+    // 5. 合成 96 道面波记录 (物理相移调制 + IFFT)
+    int nTraces = 96;
+    std::vector<double> offsets;
+    for (int i = 0; i < nTraces; ++i) offsets.push_back(x0 + i * dx);
+
+    m_seismicData = RayleighForwardSolver::synthesizeSurfaceWaveGather(
+        freqs, theoVel, dt, 1000 /*nt=1000点*/, offsets, fm);
+
+    // 6. 载入道集视图 (Tab 1)
+    QWidget* plotWidget = createSeismicView(
+        m_seismicData,
+        QStringLiteral("三层介质理论面波剖面"),
+        seismicViewContainer,
+        static_cast<float>(dt) // <--- 传入当前正演设定的真实 dt
+    );
+    QLayout* layout = seismicViewContainer->layout();
+    QLayoutItem* item;
+    while ((item = layout->takeAt(0)) != nullptr) {
+        if (item->widget()) delete item->widget();
+        delete item;
+    }
+    layout->addWidget(plotWidget);
+    mainTabWidget->setCurrentIndex(0);
+
+    // 7. 将理论曲线更新至 Tab 3 (Plot1D)
+    if (plotCurve1D) {
+        plotCurve1D->setData(freqs, theoVel, QStringLiteral("三层介质理论基阶频散曲线 (3-Layer Theoretical)"));
+        plotCurve1D->graph(0)->setPen(QPen(Qt::red, 2.0));
+    }
+
+    textLog->append(QStringLiteral("[%1] 三层介质面波正演完成: H=[%2, %3]m, Vs=[%4, %5, %6]m/s, 主频=%7Hz")
+        .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
+        .arg(h1).arg(h2)
+        .arg(vs1).arg(vs2).arg(vs3)
+        .arg(fm));
 }

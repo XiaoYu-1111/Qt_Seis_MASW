@@ -7,11 +7,17 @@
 #include <QComboBox> // 确保包含了此头文件
 #include <QLabel>
 
+// 在 SeismicView2D.cpp 顶部增加：
+#include "Pro_h/SeismicIO.h"
+#include <QFileDialog>
+#include <QMessageBox>
+#include <QDateTime>
+
 // 全能地震数据显示窗口
 QWidget* createSeismicView(
 	const std::vector<std::vector<float>>& data,
 	const QString& title,
-	QWidget* parent)
+	QWidget* parent, float dt)
 {
 	if (data.empty() || data[0].empty()) {
 		qDebug() << "Empty seismic data";
@@ -259,12 +265,10 @@ QWidget* createSeismicView(
 	QObject::connect(plot, &QCustomPlot::customContextMenuRequested, [=](QPoint pos) {
 		QMenu* menu = new QMenu(widget);
 		menu->setAttribute(Qt::WA_DeleteOnClose);
-
 		menu->addAction("Reset View", [=]() {
 			plot->rescaleAxes(true);
 			plot->replot();
 			});
-
 		// 【修改】右键色标选择，直接联动底部的 QComboBox
 		QMenu* subCmap = menu->addMenu("Color Map");
 		for (int i = 0; i < comboStyle->count(); ++i) {
@@ -274,7 +278,6 @@ QWidget* createSeismicView(
 				comboStyle->setCurrentIndex(i);
 				});
 		}
-
 		// Wiggle 样式
 		QMenu* subWig = menu->addMenu("Wiggle Style");
 		subWig->addAction("Line Only", [=]() { wiggle->setDisplayMode(QCPSeismicWiggle::dmWiggleOnly); plot->replot(); });
@@ -374,10 +377,42 @@ QWidget* createSeismicView(
 			plot->yAxis->setTickPen(tickPen);
 
 			plot->replot();
+
+			});
+
+		menu->addSeparator();
+
+		// =========================================================
+		// 【新增】：导出道集为标准 SEGY 文件
+		// =========================================================
+		QAction* actExportSegy = menu->addAction(QStringLiteral("💾 导出道集为 SEGY (*.sgy)..."));
+		QObject::connect(actExportSegy, &QAction::triggered, [=]() {
+			QString defaultName = QString("Synthetic_Gather_%1Traces_%2.sgy")
+				.arg(nx)
+				.arg(QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss"));
+
+			QString fileName = QFileDialog::getSaveFileName(
+				widget,
+				QStringLiteral("导出地震道集为 SEGY"),
+				defaultName,
+				QStringLiteral("SEGY 地震数据 (*.sgy *.segy);;所有文件 (*.*)")
+			);
+
+			if (fileName.isEmpty()) return;
+
+			// 调用 SeismicIO 写入 SEGY 数据
+			SeismicIO::writeSegyFile2D(data, fileName.toStdString(), dt);
+
+			QMessageBox::information(
+				widget,
+				QStringLiteral("导出成功"),
+				QStringLiteral("地震道集已成功导出为 SEGY 格式！\n\n- 总道数: %1 道\n- 每道采样点数: %2 点\n- 采样间隔 dt: %3 ms\n- 保存路径: %4")
+				.arg(nx).arg(nz).arg(dt * 1000.0f).arg(fileName)
+			);
 			});
 
 		menu->popup(plot->mapToGlobal(pos));
-		});
+	});
 
 	if (!parent) widget->show();
 	return widget;

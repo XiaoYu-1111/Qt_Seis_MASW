@@ -100,6 +100,7 @@
   <ItemGroup>
     <ClCompile Include="Pro_cpp\Plot1D.cpp" />
     <ClCompile Include="Pro_cpp\QCPSeismicWiggle.cpp" />
+    <ClCompile Include="Pro_cpp\RayleighForwardSolver.cpp" />
     <ClCompile Include="Pro_cpp\SeismicIO.cpp" />
     <ClCompile Include="Pro_cpp\SeismicView2D.cpp" />
     <ClCompile Include="Pro_cpp\SignalProcessingUtils.cpp" />
@@ -116,6 +117,7 @@
   <ItemGroup>
     <QtMoc Include="Pro_h\QCPSeismicWiggle.h" />
     <QtMoc Include="Pro_h\Plot1D.h" />
+    <ClInclude Include="Pro_h\RayleighForwardSolver.h" />
     <ClInclude Include="Pro_h\SeismicIO.h" />
     <ClInclude Include="Pro_h\SeismicView2D.h" />
     <ClInclude Include="Pro_h\SignalProcessingUtils.h" />
