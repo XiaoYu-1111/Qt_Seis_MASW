@@ -32,7 +32,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <QtRcc Include="Pro_Seis_WASW.qrc">
+    <QtRcc Include="Pro_Seis_MASW.qrc">
       <Filter>Resource Files</Filter>
     </QtRcc>
     <QtUic Include="Pro_Seis_MASW.ui">

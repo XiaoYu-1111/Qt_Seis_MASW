@@ -69,6 +69,11 @@
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
     <ClCompile>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
@@ -105,7 +110,7 @@
     <ClCompile Include="Pro_cpp\SeismicView2D.cpp" />
     <ClCompile Include="Pro_cpp\SignalProcessingUtils.cpp" />
     <ClCompile Include="qcustomplot.cpp" />
-    <QtRcc Include="Pro_Seis_WASW.qrc" />
+    <QtRcc Include="Pro_Seis_MASW.qrc" />
     <QtUic Include="Pro_Seis_MASW.ui" />
     <QtMoc Include="Pro_Seis_MASW.h" />
     <ClCompile Include="Pro_Seis_MASW.cpp" />
