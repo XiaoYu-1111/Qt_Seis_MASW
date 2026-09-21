@@ -1,7 +1,7 @@
 
 ---
 
-# SeisTool-WASW 面波频散分析与处理系统
+# SeisTool-MASW 面波频散分析与处理系统
 
 [![C++](https://img.shields.io/badge/Language-C%2B%2B17-blue.svg)](https://isocpp.org/)
 [![Qt](https://img.shields.io/badge/Framework-Qt%205%20%2F%20Qt%206-green.svg)](https://www.qt.io/)
@@ -9,7 +9,7 @@
 [![OpenMP](https://img.shields.io/badge/Parallel-OpenMP-red.svg)](https://www.openmp.org/)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20(MSVC)-lightgrey.svg)]()
 
-**SeisTool-WASW** 是一款面向近地表地球物理工程勘察的专业面波频散分析与正演模拟系统（MASW，Multichannel Analysis of Surface Waves）。系统集成了全格式 SEGY 地震道集解析、多模式剖面显示（Wiggle/ColorMap）、层状介质理论面波正演合成、基于 Eigen+OpenMP 的多核并行移相法能量谱计算、交互式局部极大值自动吸附拾取（Snap-to-Peak）以及出版级科研图表成图与数据导出功能。
+**SeisTool-MASW** 是一款面向近地表地球物理工程勘察的专业面波频散分析与正演模拟系统（MASW，Multichannel Analysis of Surface Waves）。系统集成了全格式 SEGY 地震道集解析、多模式剖面显示（Wiggle/ColorMap）、层状介质理论面波正演合成、基于 Eigen+OpenMP 的多核并行移相法能量谱计算、交互式局部极大值自动吸附拾取（Snap-to-Peak）以及出版级科研图表成图与数据导出功能。
 
 ## 界面与效果预览
 
