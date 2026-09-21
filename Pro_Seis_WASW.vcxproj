@@ -16,7 +16,7 @@
     <WindowsTargetPlatformVersion Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">10.0</WindowsTargetPlatformVersion>
     <WindowsTargetPlatformVersion Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">10.0</WindowsTargetPlatformVersion>
     <QtMsBuild Condition="'$(QtMsBuild)'=='' OR !Exists('$(QtMsBuild)\qt.targets')">$(MSBuildProjectDirectory)\QtMsBuild</QtMsBuild>
-    <ProjectName>Qt_Seis_WASW</ProjectName>
+    <ProjectName>Qt_Seis_MASW</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
@@ -106,9 +106,9 @@
     <ClCompile Include="Pro_cpp\SignalProcessingUtils.cpp" />
     <ClCompile Include="qcustomplot.cpp" />
     <QtRcc Include="Pro_Seis_WASW.qrc" />
-    <QtUic Include="Pro_Seis_WASW.ui" />
-    <QtMoc Include="Pro_Seis_WASW.h" />
-    <ClCompile Include="Pro_Seis_WASW.cpp" />
+    <QtUic Include="Pro_Seis_MASW.ui" />
+    <QtMoc Include="Pro_Seis_MASW.h" />
+    <ClCompile Include="Pro_Seis_MASW.cpp" />
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>

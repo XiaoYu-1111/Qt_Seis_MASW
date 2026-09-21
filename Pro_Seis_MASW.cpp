@@ -1,5 +1,5 @@
-﻿#include "Pro_Seis_WASW.h"
-#include "ui_Pro_Seis_WASW.h"
+﻿#include "Pro_Seis_MASW.h"
+#include "ui_Pro_Seis_MASW.h"
 #include "qcustomplot.h"
 #include "style.h"
 
@@ -92,12 +92,12 @@ static QCPColorGradient getScientificGradient(const QString& type, bool invert =
     return grad;
 }
 
-Pro_Seis_WASW::Pro_Seis_WASW(QWidget* parent)
-    : QMainWindow(parent), ui(new Ui::Pro_Seis_WASWClass)
+Pro_Seis_MASW::Pro_Seis_MASW(QWidget* parent)
+    : QMainWindow(parent), ui(new Ui::Pro_Seis_MASWClass)
 {
     ui->setupUi(this);
 
-    this->setWindowTitle(QStringLiteral("SeisTool-WASW 面波频散分析系统 v1.0"));
+    this->setWindowTitle(QStringLiteral("SeisTool-MASW 面波频散分析系统 v1.0"));
     this->setMinimumSize(1100,680);
     this->setStyleSheet(StyleHelper::getDarkScientificStyle());
     setWindowIcon(QIcon(":/Pro_Seis_WASW/icon/layer.png"));
@@ -111,12 +111,12 @@ Pro_Seis_WASW::Pro_Seis_WASW(QWidget* parent)
     statusBar()->showMessage(QStringLiteral("就绪 (Ready)"));
 }
 
-Pro_Seis_WASW::~Pro_Seis_WASW()
+Pro_Seis_MASW::~Pro_Seis_MASW()
 {
     delete ui;
 }
 
-void Pro_Seis_WASW::createActionsAndToolBars()
+void Pro_Seis_MASW::createActionsAndToolBars()
 {
     // =========================================================
     // 方案：直接在工具栏嵌入带 #btnPrimary 样式的标准 QPushButton
@@ -147,13 +147,13 @@ void Pro_Seis_WASW::createActionsAndToolBars()
     btnOpen->setToolTip(QStringLiteral("打开并载入 SEGY 地震道集数据 (Ctrl+O)"));
 
     // 点击直接触发载入
-    connect(btnOpen, &QPushButton::clicked, this, &Pro_Seis_WASW::onOpenSegy);
+    connect(btnOpen, &QPushButton::clicked, this, &Pro_Seis_MASW::onOpenSegy);
 
     // 将蓝底按钮加入工具栏
     ui->mainToolBar->addWidget(btnOpen);
 }
 
-void Pro_Seis_WASW::initUI()
+void Pro_Seis_MASW::initUI()
 {
     mainTabWidget = new QTabWidget(this);
     setCentralWidget(mainTabWidget);
@@ -161,7 +161,7 @@ void Pro_Seis_WASW::initUI()
     initMainTabs();
 }
 
-void Pro_Seis_WASW::initMainTabs()
+void Pro_Seis_MASW::initMainTabs()
 {
     // --- 页面 1: 原始道集容器 (保持不变) ---
     seismicViewContainer = new QWidget(this);
@@ -270,7 +270,7 @@ void Pro_Seis_WASW::initMainTabs()
 
         // --- 动作 4: 导出为 SEGY ---
         QAction* actExportSegy = menu.addAction(QStringLiteral("💾 导出频散能量谱为 SEGY (*.sgy)..."));
-        connect(actExportSegy, &QAction::triggered, this, &Pro_Seis_WASW::exportDispersionToSegy);
+        connect(actExportSegy, &QAction::triggered, this, &Pro_Seis_MASW::exportDispersionToSegy);
 
         // 在鼠标点击处弹出菜单
         menu.exec(plotDispersion->mapToGlobal(pos));
@@ -300,7 +300,7 @@ void Pro_Seis_WASW::initMainTabs()
 
     // 绑定信号：切换模式时瞬间重绘，无需重新计算算法！
     connect(comboNormMode, QOverload<int>::of(&QComboBox::currentIndexChanged),
-        this, &Pro_Seis_WASW::renderDispersionMap);
+        this, &Pro_Seis_MASW::renderDispersionMap);
     // 色标切换控件
     QLabel* lblCmap = new QLabel(QStringLiteral("色标 (Colormap):"), dispBottomBar);
     lblCmap->setStyleSheet("color: #cbd5e1; font-weight: bold; border: none;");
@@ -323,8 +323,8 @@ void Pro_Seis_WASW::initMainTabs()
     dispMainLayout->addWidget(dispBottomBar, 0); // 权重 0，固定在底部
 
     // 3. 信号绑定
-    connect(comboDispCmap, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &Pro_Seis_WASW::updateDispersionColormap);
-    connect(chkDispInv, &QCheckBox::toggled, this, &Pro_Seis_WASW::updateDispersionColormap);
+    connect(comboDispCmap, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &Pro_Seis_MASW::updateDispersionColormap);
+    connect(chkDispInv, &QCheckBox::toggled, this, &Pro_Seis_MASW::updateDispersionColormap);
 
     // 4. 鼠标滑动动态读取 (频率, 速度, 归一化能量)
     connect(plotDispersion, &QCustomPlot::mouseMove, this, [=](QMouseEvent* e) {
@@ -399,10 +399,10 @@ void Pro_Seis_WASW::initMainTabs()
         updatePickVisuals();
         });
 
-    connect(btnExportCurve, &QPushButton::clicked, this, &Pro_Seis_WASW::exportPickedCurve);
+    connect(btnExportCurve, &QPushButton::clicked, this, &Pro_Seis_MASW::exportPickedCurve);
 
     // 4. 监听热力图点击事件
-    connect(plotDispersion, &QCustomPlot::mousePress, this, &Pro_Seis_WASW::onDispersionPlotClicked);
+    connect(plotDispersion, &QCustomPlot::mousePress, this, &Pro_Seis_MASW::onDispersionPlotClicked);
 
     // --- 页面 3: 提取的频散曲线对比 ---
     plotCurve1D = new Data_show::Plot1D(this);
@@ -414,7 +414,7 @@ void Pro_Seis_WASW::initMainTabs()
     mainTabWidget->addTab(plotCurve1D, QStringLiteral("3. 频散曲线 (Extracted Curves)"));
 }
 
-void Pro_Seis_WASW::initControlDock()
+void Pro_Seis_MASW::initControlDock()
 {
     controlDock = new QDockWidget(QStringLiteral("控制面板"), this);
     controlDock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
@@ -505,7 +505,7 @@ void Pro_Seis_WASW::initControlDock()
     btnCalculate = new QPushButton(QStringLiteral("🚀 开始计算频散谱"), pageDispersion);
     btnCalculate->setObjectName("btnPrimary");
     btnCalculate->setMinimumHeight(38);
-    connect(btnCalculate, &QPushButton::clicked, this, &Pro_Seis_WASW::onCalculateClicked);
+    connect(btnCalculate, &QPushButton::clicked, this, &Pro_Seis_MASW::onCalculateClicked);
     dispLayout->addWidget(btnCalculate);
 
     dispLayout->addStretch(); // 将控件往顶部压缩，防止变形
@@ -583,7 +583,7 @@ void Pro_Seis_WASW::initControlDock()
         "QPushButton:hover { background-color: #047857; }"
         "QPushButton:pressed { background-color: #065f46; }"
     );
-    connect(btnSynthetic, &QPushButton::clicked, this, &Pro_Seis_WASW::onSyntheticClicked);
+    connect(btnSynthetic, &QPushButton::clicked, this, &Pro_Seis_MASW::onSyntheticClicked);
     synthLayout->addWidget(btnSynthetic);
 
     synthLayout->addStretch(); // 弹性占位
@@ -599,7 +599,7 @@ void Pro_Seis_WASW::initControlDock()
     addDockWidget(Qt::LeftDockWidgetArea, controlDock);
 }
 
-void Pro_Seis_WASW::initLogDock()
+void Pro_Seis_MASW::initLogDock()
 {
     logDock = new QDockWidget(QStringLiteral("运行日志 (Console Log)"), this);
     logDock->setAllowedAreas(Qt::BottomDockWidgetArea);
@@ -633,7 +633,8 @@ void Pro_Seis_WASW::initLogDock()
 // =========================================================
 // 读取 SEGY 并嵌入显示
 // =========================================================
-void Pro_Seis_WASW::onOpenSegy()
+
+void Pro_Seis_MASW::onOpenSegy()
 {
     QString fileName = QFileDialog::getOpenFileName(
         this,
@@ -679,7 +680,7 @@ void Pro_Seis_WASW::onOpenSegy()
     mainTabWidget->setCurrentIndex(0);
 }
 
-void Pro_Seis_WASW::onCalculateClicked()
+void Pro_Seis_MASW::onCalculateClicked()
 {
     if (m_seismicData.empty()) {
         QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请先加载地震道集数据！"));
@@ -724,7 +725,7 @@ void Pro_Seis_WASW::onCalculateClicked()
         .arg(QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss"))));
 }
 
-void Pro_Seis_WASW::updateDispersionColormap()
+void Pro_Seis_MASW::updateDispersionColormap()
 {
     if (!dispColorMap) return;
 
@@ -737,7 +738,7 @@ void Pro_Seis_WASW::updateDispersionColormap()
     plotDispersion->replot();
 }
 
-void Pro_Seis_WASW::renderDispersionMap()
+void Pro_Seis_MASW::renderDispersionMap()
 {
     if (m_rawDispersionEnergy.empty() || m_dispNf <= 0 || m_dispNv <= 0) return;
 
@@ -831,7 +832,7 @@ void Pro_Seis_WASW::renderDispersionMap()
     plotDispersion->replot();
 }
 
-void Pro_Seis_WASW::onDispersionPlotClicked(QMouseEvent* event)
+void Pro_Seis_MASW::onDispersionPlotClicked(QMouseEvent* event)
 {
     // 未开启拾取模式、未计算数据或非左键点击，直接跳过
     if (!chkPickMode || !chkPickMode->isChecked()) return;
@@ -899,7 +900,7 @@ void Pro_Seis_WASW::onDispersionPlotClicked(QMouseEvent* event)
     updatePickVisuals();
 }
 
-void Pro_Seis_WASW::updatePickVisuals()
+void Pro_Seis_MASW::updatePickVisuals()
 {
     QVector<double> qf, qv;
     std::vector<double> std_f, std_v;
@@ -959,7 +960,7 @@ void Pro_Seis_WASW::updatePickVisuals()
     }
 }
 
-void Pro_Seis_WASW::exportPickedCurve()
+void Pro_Seis_MASW::exportPickedCurve()
 {
     if (m_pickedPoints.isEmpty()) {
         QMessageBox::information(this, QStringLiteral("提示"), QStringLiteral("当前暂无拾取的频散曲线点！"));
@@ -1002,8 +1003,7 @@ void Pro_Seis_WASW::exportPickedCurve()
         .arg(m_pickedPoints.size()).arg(fileName));
 }
 
-
-void Pro_Seis_WASW::exportDispersionToSegy()
+void Pro_Seis_MASW::exportDispersionToSegy()
 {
     // 1. 安全检查
     if (m_rawDispersionEnergy.empty() || m_dispNf <= 0 || m_dispNv <= 0) {
@@ -1094,7 +1094,7 @@ void Pro_Seis_WASW::exportDispersionToSegy()
         .arg(m_dispNf).arg(m_dispNv).arg(m_dispVmin).arg(m_dispVmax).arg(m_dispFmin).arg(m_dispFmax));
 }
 
-void Pro_Seis_WASW::onSyntheticClicked()
+void Pro_Seis_MASW::onSyntheticClicked()
 {
     // 1. 动态从面板读取三层地质模型参数
     double h1 = spinLayerH1->value();

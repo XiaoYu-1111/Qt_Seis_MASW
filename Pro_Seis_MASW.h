@@ -28,19 +28,19 @@ class QCPColorScale;
 class QCPGraph;
 
 namespace Ui {
-    class Pro_Seis_WASWClass;
+    class Pro_Seis_MASWClass;
 }
 
 // =========================================================
 // 主窗口类定义
 // =========================================================
-class Pro_Seis_WASW : public QMainWindow
+class Pro_Seis_MASW : public QMainWindow
 {
     Q_OBJECT
 
 public:
-    explicit Pro_Seis_WASW(QWidget* parent = nullptr);
-    ~Pro_Seis_WASW() override;
+    explicit Pro_Seis_MASW(QWidget* parent = nullptr);
+    ~Pro_Seis_MASW() override;
 
 private:
     // --- 界面初始化方法 ---
@@ -65,7 +65,7 @@ private slots:
     void onDispersionPlotClicked(QMouseEvent* event); // 频散图鼠标点击与自动吸附拾取
 
 private:
-    Ui::Pro_Seis_WASWClass* ui;
+    Ui::Pro_Seis_MASWClass* ui;
 
     // =====================================================
     // 1. 中央工作区多标签页 (Central Tab Widgets)
@@ -109,7 +109,7 @@ private:
     QPushButton* btnCalculate = nullptr;           // 开始计算按钮
 
     // --- Tab 2: 理论正演模型参数 (1D Model Synthesis) ---
-    // 找到 Pro_Seis_WASW.h 中的理论正演模型参数区域，修改/替换为：
+    // 找到 Pro_Seis_MASW.h 中的理论正演模型参数区域，修改/替换为：
     QDoubleSpinBox* spinLayerH1 = nullptr;   // 第 1 层厚度 H1 (m)
     QDoubleSpinBox* spinLayerVs1 = nullptr;  // 第 1 层横波速度 Vs1 (m/s)
     QDoubleSpinBox* spinLayerH2 = nullptr;   // 【新增】第 2 层厚度 H2 (m)

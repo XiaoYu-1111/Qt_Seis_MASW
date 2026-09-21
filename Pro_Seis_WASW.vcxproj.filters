@@ -35,13 +35,13 @@
     <QtRcc Include="Pro_Seis_WASW.qrc">
       <Filter>Resource Files</Filter>
     </QtRcc>
-    <QtUic Include="Pro_Seis_WASW.ui">
+    <QtUic Include="Pro_Seis_MASW.ui">
       <Filter>Form Files</Filter>
     </QtUic>
-    <QtMoc Include="Pro_Seis_WASW.h">
+    <QtMoc Include="Pro_Seis_MASW.h">
       <Filter>Header Files</Filter>
     </QtMoc>
-    <ClCompile Include="Pro_Seis_WASW.cpp">
+    <ClCompile Include="Pro_Seis_MASW.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
