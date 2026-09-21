@@ -13,9 +13,15 @@
 
 ## 界面与效果预览
 
+**原始地震道集**
+![Dashboard Screenshot](Pro_image/main1.png)
+**频散能量谱**
+![Dashboard Screenshot](Pro_image/main2.png)
+**频散曲线**
+![Dashboard Screenshot](Pro_image/main3.png)
+
 | 原始道集与波形剖面 (Tab 1) | 频散能量谱与自动吸附拾取 (Tab 2) | 频散曲线对比与反演质控 (Tab 3) |
 | :---: | :---: | :---: |
-| ![原始地震道集](Pro_image/main1.png) | ![频散能量谱](Pro_image/main2.png) | ![频散曲线对比](Pro_image/main3.png) |
 | ![原始地震道集](Pro_image/sync1.png) | ![频散能量谱](Pro_image/sync2.png) | ![频散曲线对比](Pro_image/sync3.png) |
 | *Wiggle 抖动线 + 变面积填充叠加变密度* | *移相法相速度谱（支持色标/归一化切换）* | *Plot1D 期刊级展示（实测点与理论线叠合）* |
 
