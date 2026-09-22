@@ -5,8 +5,17 @@
 #include <memory>
 #include <QVector>
 #include <QPointF>
+#include <QProgressBar>
+#include <QLineEdit>
 
 #include "Pro_h/Plot1D.h"
+
+#include <QThread>
+#include <fstream>
+#include <random>
+
+// 引入 ONNX Runtime C++ API
+#include <onnxruntime_cxx_api.h>
 
 // =========================================================
 // 前置声明 (Forward Declarations)
@@ -63,6 +72,9 @@ private slots:
     void onCalculateClicked();                        // 开始计算频散谱
     void onSyntheticClicked();                        // 一键合成理论面波记录
     void onDispersionPlotClicked(QMouseEvent* event); // 频散图鼠标点击与自动吸附拾取
+
+    void onStartDatasetGeneration(); // 开始批量生成数据集
+    void onAiPickClicked(); // AI 一键自动拾取槽函数
 
 private:
     Ui::Pro_Seis_MASWClass* ui;
@@ -138,4 +150,15 @@ private:
     // =====================================================
     QDockWidget* logDock = nullptr;
     QTextEdit* textLog = nullptr;
+
+    // =====================================================
+    // Tab 3: 数据集批量生成控件 (Dataset Generation)
+    // =====================================================
+    QSpinBox* spinSampleCount = nullptr;  // 生成样本数量 (例如 1000)
+    QLineEdit* editOutputDir = nullptr;  // 输出目录
+    QPushButton* btnBrowseDir = nullptr;  // 浏览目录按钮
+    QProgressBar* progressGen = nullptr;  // 生成进度条
+    QPushButton* btnStartGen = nullptr;  // 启动生成按钮
+
+    QPushButton* btnAiPick = nullptr; // AI 一键拾取按钮
 };

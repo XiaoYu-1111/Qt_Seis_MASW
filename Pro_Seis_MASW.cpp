@@ -367,9 +367,28 @@ void Pro_Seis_MASW::initMainTabs()
     btnExportCurve = new QPushButton(QStringLiteral("导出曲线..."), dispBottomBar);
     btnExportCurve->setFixedHeight(26);
 
-    // 将新控件装入底栏
+    // 找到 initMainTabs() 中配置 dispBottomBar 拾取按钮的地方，追加：
+
+    btnAiPick = new QPushButton(QStringLiteral("🤖 AI 一键拾取"), dispBottomBar);
+    btnAiPick->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #7c3aed;"       // 亮紫色，突出 AI 科技感
+        "   border: 1px solid #6d28d9;"
+        "   color: white;"
+        "   font-weight: bold;"
+        "   border-radius: 4px;"
+        "   padding: 4px 10px;"
+        "   min-height: 26px;"
+        "}"
+        "QPushButton:hover { background-color: #6d28d9; }"
+        "QPushButton:pressed { background-color: #5b21b6; }"
+    );
+    connect(btnAiPick, &QPushButton::clicked, this, &Pro_Seis_MASW::onAiPickClicked);
+
+    // 将 AI 按钮放在“拾取模式”复选框的旁边
     barLayout->addWidget(vline);
     barLayout->addWidget(chkPickMode);
+    barLayout->addWidget(btnAiPick);          // <--- 插入 AI 拾取按钮
     barLayout->addWidget(btnUndoPick);
     barLayout->addWidget(btnClearPick);
     barLayout->addWidget(btnExportCurve);
@@ -510,7 +529,6 @@ void Pro_Seis_MASW::initControlDock()
 
     dispLayout->addStretch(); // 将控件往顶部压缩，防止变形
 
-
     // =========================================================================
     // 【页面 2】理论正演模拟 (Tab 2: Theoretical Synthesis)
     // =========================================================================
@@ -588,12 +606,87 @@ void Pro_Seis_MASW::initControlDock()
 
     synthLayout->addStretch(); // 弹性占位
 
+    // =========================================================================
+    // 【页面 3】AI 训练集批量生成 (Tab 3: Dataset Generation)
+    // =========================================================================
+    QWidget* pageDatasetGen = new QWidget(dockTabs);
+    QVBoxLayout* genLayout = new QVBoxLayout(pageDatasetGen);
+    genLayout->setContentsMargins(8, 8, 8, 8);
+    genLayout->setSpacing(10);
+
+    QGroupBox* genGroup = new QGroupBox(QStringLiteral("批量生成配置"), pageDatasetGen);
+    QFormLayout* formGen = new QFormLayout(genGroup);
+    formGen->setSpacing(8);
+
+    // 1. 样本数量设置
+    spinSampleCount = new QSpinBox(genGroup);
+    spinSampleCount->setRange(10, 50000);
+    spinSampleCount->setValue(1000); // 默认批量生成 1000 个
+    spinSampleCount->setSingleStep(100);
+    spinSampleCount->setSuffix(QStringLiteral(" 组"));
+
+    // 2. 输出路径设置
+    QWidget* dirContainer = new QWidget(genGroup);
+    QHBoxLayout* dirLayout = new QHBoxLayout(dirContainer);
+    dirLayout->setContentsMargins(0, 0, 0, 0);
+    dirLayout->setSpacing(4);
+
+    editOutputDir = new QLineEdit(dirContainer);
+    // 默认指向之前创建的 AI 训练工作室目录
+    editOutputDir->setText(QStringLiteral("D:/Code/visual_code/QT_project/Qt_Seis_MASW/AI_Train_MASW/dataset"));
+
+    btnBrowseDir = new QPushButton(QStringLiteral("..."), dirContainer);
+    btnBrowseDir->setFixedWidth(30);
+    connect(btnBrowseDir, &QPushButton::clicked, this, [=]() {
+        QString dir = QFileDialog::getExistingDirectory(this, QStringLiteral("选择数据集输出文件夹"), editOutputDir->text());
+        if (!dir.isEmpty()) editOutputDir->setText(dir);
+        });
+
+    dirLayout->addWidget(editOutputDir);
+    dirLayout->addWidget(btnBrowseDir);
+
+    formGen->addRow(QStringLiteral("样本总数:"), spinSampleCount);
+    formGen->addRow(QStringLiteral("输出目录:"), dirContainer);
+    genLayout->addWidget(genGroup);
+
+    // 3. 说明与进度条
+    QLabel* lblTip = new QLabel(QStringLiteral("提示：将随机三层地质模型 (Vs: 150~1000 m/s)，正演并计算相移频散谱，写入纯二进制大文件。"), pageDatasetGen);
+    lblTip->setStyleSheet("color: #94a3b8; font-size: 11px;");
+    lblTip->setWordWrap(true);
+    genLayout->addWidget(lblTip);
+
+    progressGen = new QProgressBar(pageDatasetGen);
+    progressGen->setRange(0, 100);
+    progressGen->setValue(0);
+    progressGen->setTextVisible(true);
+    progressGen->setStyleSheet(
+        "QProgressBar { border: 1px solid #334155; border-radius: 4px; text-align: center; background: #0f172a; color: white; }"
+        "QProgressBar::chunk { background-color: #0284c7; border-radius: 3px; }"
+    );
+    genLayout->addWidget(progressGen);
+
+    // 4. 启动生成按钮
+    btnStartGen = new QPushButton(QStringLiteral("🚀 批量生成训练集 (.bin)"), pageDatasetGen);
+    btnStartGen->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #7c3aed; border: 1px solid #6d28d9; color: white;"
+        "   font-weight: bold; border-radius: 4px; padding: 8px; min-height: 32px;"
+        "}"
+        "QPushButton:hover { background-color: #6d28d9; }"
+        "QPushButton:disabled { background-color: #475569; }"
+    );
+    connect(btnStartGen, &QPushButton::clicked, this, &Pro_Seis_MASW::onStartDatasetGeneration);
+    genLayout->addWidget(btnStartGen);
+
+    genLayout->addStretch();
+
 
     // =========================================================================
     // 装配 Tab 页面到 DockWidget
     // =========================================================================
     dockTabs->addTab(pageDispersion, QStringLiteral("📊 频散分析"));
     dockTabs->addTab(pageSynthetic, QStringLiteral("🧪 理论正演"));
+    dockTabs->addTab(pageDatasetGen, QStringLiteral("📦 样本生成")); // <--- 新增 Tab 3
 
     controlDock->setWidget(dockTabs);
     addDockWidget(Qt::LeftDockWidgetArea, controlDock);
@@ -1163,4 +1256,281 @@ void Pro_Seis_MASW::onSyntheticClicked()
         .arg(h1).arg(h2)
         .arg(vs1).arg(vs2).arg(vs3)
         .arg(fm));
+}
+
+void Pro_Seis_MASW::onStartDatasetGeneration()
+{
+    QString outDir = editOutputDir->text().trimmed();
+    if (outDir.isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请先指定输出目录！"));
+        return;
+    }
+
+    QDir dir(outDir);
+    if (!dir.exists()) dir.mkpath(".");
+
+    int totalSamples = spinSampleCount->value();
+    btnStartGen->setEnabled(false);
+    progressGen->setValue(0);
+
+    // 提取当前的扫描网格参数 (保证与主程序完全一致)
+    QPoint gridRes = comboGridQuality->currentData().toPoint();
+    int nf = gridRes.x();
+    int nv = gridRes.y();
+    float fmin = static_cast<float>(spinFmin->value());
+    float fmax = static_cast<float>(spinFreqMax->value());
+    float vmin = static_cast<float>(spinVmin->value());
+    float vmax = static_cast<float>(spinVmax->value());
+    float dt = static_cast<float>(spinDt->value() / 1000.0);
+    float dx = static_cast<float>(spinDx->value());
+    float x0 = static_cast<float>(spinOffset0->value());
+
+    textLog->append(QStringLiteral("[%1] 启动训练集生成，目标样本数: %2 组...")
+        .arg(QDateTime::currentDateTime().toString("hh:mm:ss")).arg(totalSamples));
+
+    // 使用 QThread 在子线程执行，防止主界面卡顿
+    QThread* workerThread = QThread::create([=]() {
+        QString inputBinPath = outDir + "/dataset_inputs.bin";
+        QString labelBinPath = outDir + "/dataset_labels.bin";
+        QString metaPath = outDir + "/dataset_meta.txt";
+
+        std::ofstream fileInputs(inputBinPath.toStdString(), std::ios::binary | std::ios::trunc);
+        std::ofstream fileLabels(labelBinPath.toStdString(), std::ios::binary | std::ios::trunc);
+
+        // 随机参数生成器 (随机地质模型)
+        std::mt19937 rng(1337); // 固定随机种子保证可复现
+        std::uniform_real_distribution<double> distH1(2.0, 15.0);    // 第1层厚度: 2~15m
+        std::uniform_real_distribution<double> distH2(5.0, 30.0);    // 第2层厚度: 5~30m
+        std::uniform_real_distribution<double> distVs1(150.0, 320.0); // 浅层速度: 150~320 m/s
+        std::uniform_real_distribution<double> distDVs2(50.0, 300.0); // 中层速度增量
+        std::uniform_real_distribution<double> distDVs3(100.0, 500.0);// 基底层速度增量
+        std::uniform_real_distribution<double> distFm(8.0, 20.0);     // 子波主频
+
+        // 构建频率采样序列
+        std::vector<double> freqs(nf);
+        float df_scan = (fmax - fmin) / std::max(1, nf - 1);
+        for (int i = 0; i < nf; ++i) freqs[i] = fmin + i * df_scan;
+
+        // 检波器物理偏移距
+        int nTraces = 96;
+        std::vector<double> offsets(nTraces);
+        for (int i = 0; i < nTraces; ++i) offsets[i] = x0 + i * dx;
+
+        for (int s = 0; s < totalSamples; ++s) {
+            // 1. 随机生成 3 层地质模型
+            double h1 = distH1(rng);
+            double h2 = distH2(rng);
+            double vs1 = distVs1(rng);
+            double vs2 = vs1 + distDVs2(rng);
+            double vs3 = vs2 + distDVs3(rng);
+            double fm = distFm(rng);
+
+            LayerModel model;
+            model.H = { h1, h2 };
+            model.VS = { vs1, vs2, vs3 };
+            model.VP = { vs1 * 2.0, vs2 * 2.0, vs3 * 2.0 };
+            model.Rho = { 1800.0, 2000.0, 2200.0 };
+
+            // 2. 正演理论基阶相速度
+            auto theoVel = RayleighForwardSolver::calcBaseDispersion(freqs, model);
+
+            // 3. 合成面波时域记录
+            auto gather = RayleighForwardSolver::synthesizeSurfaceWaveGather(
+                freqs, theoVel, dt, 1000, offsets, fm);
+
+            // 4. 移相法计算频散能量谱
+            auto energy = computePhaseShiftDispersion(
+                gather, dt, dx, x0, fmin, fmax, nf, vmin, vmax, nv);
+
+            // 5. 按频率列归一化
+            for (int fi = 0; fi < nf; ++fi) {
+                float colMax = 0.0f;
+                for (int vi = 0; vi < nv; ++vi) colMax = std::max(colMax, energy[vi][fi]);
+                if (colMax > 1e-6f) {
+                    for (int vi = 0; vi < nv; ++vi) energy[vi][fi] /= colMax;
+                }
+            }
+
+            // 6. 写入文件: inputs 写入 Nv * Nf 个 float32
+            for (int vi = 0; vi < nv; ++vi) {
+                fileInputs.write(reinterpret_cast<const char*>(energy[vi].data()), nf * sizeof(float));
+            }
+
+            // labels 写入 Nf 个 float32 (理论相速度真值)
+            std::vector<float> labelFloat(nf);
+            for (int fi = 0; fi < nf; ++fi) labelFloat[fi] = static_cast<float>(theoVel[fi]);
+            fileLabels.write(reinterpret_cast<const char*>(labelFloat.data()), nf * sizeof(float));
+
+            // 更新进度条 (每 10 个样本更新一次)
+            if (s % 10 == 0 || s == totalSamples - 1) {
+                int percent = (s + 1) * 100 / totalSamples;
+                QMetaObject::invokeMethod(progressGen, "setValue", Qt::QueuedConnection, Q_ARG(int, percent));
+            }
+        }
+
+        fileInputs.close();
+        fileLabels.close();
+
+        // 写入元数据 txt
+        std::ofstream fileMeta(metaPath.toStdString());
+        fileMeta << "samples=" << totalSamples << "\n"
+            << "nv=" << nv << "\n"
+            << "nf=" << nf << "\n"
+            << "fmin=" << fmin << "\n"
+            << "fmax=" << fmax << "\n"
+            << "vmin=" << vmin << "\n"
+            << "vmax=" << vmax << "\n";
+        fileMeta.close();
+
+        // 完成通知
+        QMetaObject::invokeMethod(this, [=]() {
+            btnStartGen->setEnabled(true);
+            textLog->append(QStringLiteral("[%1] 训练集批量生成完毕！保存于: %2")
+                .arg(QDateTime::currentDateTime().toString("hh:mm:ss")).arg(outDir));
+            QMessageBox::information(this, QStringLiteral("生成完成"),
+                QStringLiteral("已成功生成 %1 组训练样本！\n\n• 输入特征: dataset_inputs.bin\n• 理论真值: dataset_labels.bin\n• 元数据: dataset_meta.txt")
+                .arg(totalSamples));
+            }, Qt::QueuedConnection);
+        });
+
+    workerThread->start();
+    connect(workerThread, &QThread::finished, workerThread, &QObject::deleteLater);
+}
+
+void Pro_Seis_MASW::onAiPickClicked()
+{
+    // 1. 基础有效性检查
+    if (m_rawDispersionEnergy.empty() || m_dispNf <= 0 || m_dispNv <= 0) {
+        QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请先计算或载入频散能量谱！"));
+        return;
+    }
+
+    // 自动寻找模型路径 (支持开发环境与最终打包环境)
+    QString modelPath = QCoreApplication::applicationDirPath() + "/models/dispersion_picker.onnx";
+    if (!QFile::exists(modelPath)) {
+        // 开发备选路径
+        modelPath = QCoreApplication::applicationDirPath() + "/../../Pro_Seis_MASW/models/dispersion_picker.onnx";
+    }
+    if (!QFile::exists(modelPath)) {
+        modelPath = QFileDialog::getOpenFileName(this, QStringLiteral("定位 AI 模型文件"), "", "ONNX Model (*.onnx)");
+        if (modelPath.isEmpty()) return;
+    }
+
+    textLog->append(QStringLiteral("[%1] 启动 AI 智能脊线推理...")
+        .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+
+    try {
+        // =========================================================
+        // 2. 初始化 ONNX Runtime 推理会话 (纯 CPU 极速推理)
+        // =========================================================
+        Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "MASW_AI_Picker");
+        Ort::SessionOptions sessionOptions;
+        sessionOptions.SetIntraOpNumThreads(4); // 开启 4 线程加速
+        sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+
+        // Windows 下使用宽字符路径加载
+        std::wstring wModelPath = modelPath.toStdWString();
+        Ort::Session session(env, wModelPath.c_str(), sessionOptions);
+
+        // =========================================================
+        // 3. 构建模型输入张量 [1, 1, Nv, Nf]
+        // =========================================================
+        int nv = m_dispNv; // 250
+        int nf = m_dispNf; // 180
+
+        // 提取当前界面归一化后的数据并展平为一维数组 (行优先)
+        std::vector<float> inputTensorValues;
+        inputTensorValues.reserve(nv * nf);
+
+        // 按照 Python 端一样的每列归一化标准送入
+        for (int vi = 0; vi < nv; ++vi) {
+            for (int fi = 0; fi < nf; ++fi) {
+                inputTensorValues.push_back(m_rawDispersionEnergy[vi][fi]);
+            }
+        }
+
+        std::vector<int64_t> inputDims = { 1, 1, nv, nf };
+        auto memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+
+        Ort::Value inputTensor = Ort::Value::CreateTensor<float>(
+            memoryInfo, inputTensorValues.data(), inputTensorValues.size(),
+            inputDims.data(), inputDims.size()
+        );
+
+        const char* inputNames[] = { "input" };
+        const char* outputNames[] = { "output" };
+
+        // =========================================================
+        // 4. 执行前向推理
+        // =========================================================
+        QElapsedTimer timer;
+        timer.start();
+
+        auto outputTensors = session.Run(
+            Ort::RunOptions{ nullptr }, inputNames, &inputTensor, 1, outputNames, 1
+        );
+
+        qint64 elapsedMs = timer.elapsed();
+
+        // 获取输出指针 (概率矩阵: 形状同为 [nv, nf])
+        float* probMatrix = outputTensors.front().GetTensorMutableData<float>();
+
+        // =========================================================
+        // 5. 后处理：加权质心法提取亚像素 1D 频散曲线坐标
+        // =========================================================
+        m_pickedPoints.clear();
+        double df = (m_dispFmax - m_dispFmin) / std::max(1, nf - 1);
+        double dv = (m_dispVmax - m_dispVmin) / std::max(1, nv - 1);
+
+        for (int fi = 0; fi < nf; ++fi) {
+            // 找到当前列概率最大的点
+            int maxVi = 0;
+            float maxProb = -1.0f;
+            for (int vi = 0; vi < nv; ++vi) {
+                float p = probMatrix[vi * nf + fi];
+                if (p > maxProb) {
+                    maxProb = p;
+                    maxVi = vi;
+                }
+            }
+
+            // 局部质心平滑 (取峰值上下各 3 个像素)
+            int viStart = std::max(0, maxVi - 3);
+            int viEnd = std::min(nv - 1, maxVi + 3);
+            double weightSum = 0.0;
+            double idxWeightedSum = 0.0;
+
+            for (int vi = viStart; vi <= viEnd; ++vi) {
+                double w = probMatrix[vi * nf + fi];
+                weightSum += w;
+                idxWeightedSum += vi * w;
+            }
+
+            double subPixelVi = (weightSum > 1e-4) ? (idxWeightedSum / weightSum) : maxVi;
+
+            // 换算为物理坐标
+            double freq = m_dispFmin + fi * df;
+            double vel = m_dispVmin + subPixelVi * dv;
+
+            m_pickedPoints.append(QPointF(freq, vel));
+        }
+
+        // =========================================================
+        // 6. 实时同步更新两处视图
+        // =========================================================
+        updatePickVisuals();
+
+        textLog->append(QStringLiteral("[%1] 🤖 AI 频散曲线自动识别完成！共拾取 %2 个频点，推理耗时: %3 ms。")
+            .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
+            .arg(m_pickedPoints.size())
+            .arg(elapsedMs));
+
+        QMessageBox::information(this, QStringLiteral("AI 拾取完成"),
+            QStringLiteral("神经网络已完成全频段面波脊线提取！\n\n- 拾取点数: %1 点\n- 模型耗时: %2 ms\n- 结果已同步至 Tab 2 与 Tab 3。")
+            .arg(m_pickedPoints.size()).arg(elapsedMs));
+
+    }
+    catch (const std::exception& e) {
+        QMessageBox::critical(this, QStringLiteral("ONNX 推理异常"), QString::fromLocal8Bit(e.what()));
+    }
 }

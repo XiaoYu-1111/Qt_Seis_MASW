@@ -6,7 +6,7 @@ const double PI = 3.14159265358979323846;
 // =========================================================
 // 1. fastcalc 的 C++ 严格等价实现
 // =========================================================
-double RayleighForwardSolver::fastCalc(double x, double f, const LayerModel& model)
+double RayleighForwardSolver::fastCalc(double x, double f, const LayerModel& model) 
 {
     int n = model.VS.size();
     if (n < 2) return 0.0;
