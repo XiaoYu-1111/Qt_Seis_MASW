@@ -137,6 +137,7 @@
   <ItemGroup>
     <None Include="Python_script\02_plot_dispersion_map.py" />
     <None Include="Python_script\01_plot_seismic_gather.py" />
+    <None Include="Python_script\run_inversion.py" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

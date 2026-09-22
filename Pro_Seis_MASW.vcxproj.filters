@@ -106,5 +106,8 @@
     <None Include="Python_script\02_plot_dispersion_map.py">
       <Filter>Python_script</Filter>
     </None>
+    <None Include="Python_script\run_inversion.py">
+      <Filter>Python_script</Filter>
+    </None>
   </ItemGroup>
 </Project>

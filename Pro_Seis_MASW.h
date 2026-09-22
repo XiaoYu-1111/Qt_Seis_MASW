@@ -7,6 +7,12 @@
 #include <QPointF>
 #include <QProgressBar>
 #include <QLineEdit>
+#include <QTextStream>
+#include <QHeaderView>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
+#include <QMimeData>
 
 #include "Pro_h/Plot1D.h"
 
@@ -31,10 +37,13 @@ class QPushButton;
 class QCheckBox;
 class QLabel;
 class QMouseEvent;
+class QTableWidget;
 
 class QCPColorMap;
 class QCPColorScale;
 class QCPGraph;
+
+
 
 namespace Ui {
     class Pro_Seis_MASWClass;
@@ -59,12 +68,19 @@ private:
     void initLogDock();
     void createActionsAndToolBars();
 
+    void loadSegyFile(const QString& filePath); // 核心：统一的 SEGY 文件解析与载入
+
     // --- 频散图渲染与联动辅助方法 ---
     void renderDispersionMap();                       // 根据当前归一化与参数渲染频散图
     void updateDispersionColormap();                  // 切换色标 / 反转色标
     void updatePickVisuals();                         // 同步刷新 Tab 2 覆盖线与 Tab 3 频散曲线
     void exportPickedCurve();                         // 导出拾取的频散曲线文本 (txt/csv)
     void exportDispersionToSegy();                    // 导出二维频散能量谱为 SEGY 格式
+    void displayInversionModel(const QString& filePath); // 解析并绘制模型
+
+    void updateDataBadges(const QString& fileName, int traces, int samples, float dtMs);
+
+    void initStatusBar();                 // 初始化仪器级状态栏
 
 private slots:
     // --- 核心业务槽函数 ---
@@ -75,6 +91,13 @@ private slots:
 
     void onStartDatasetGeneration(); // 开始批量生成数据集
     void onAiPickClicked(); // AI 一键自动拾取槽函数
+
+    void onLoadInversionModel(); // 载入反演模型文件槽函数
+
+    void onResetAll();        // 一键重置全部视图
+    void onShowHelp();        // 显示系统帮助与说明
+
+    
 
 private:
     Ui::Pro_Seis_MASWClass* ui;
@@ -161,4 +184,36 @@ private:
     QPushButton* btnStartGen = nullptr;  // 启动生成按钮
 
     QPushButton* btnAiPick = nullptr; // AI 一键拾取按钮
+
+    // =====================================================
+    // 6. Tab 4: 1D 速度剖面与地层反演展示控件
+    // =====================================================
+    QWidget* inversionContainer = nullptr; // Tab 4 总容器
+    Data_show::Plot1D* plotVsProfile = nullptr; // 1D 阶梯剖面图表
+    QTableWidget* tableVsModel = nullptr; // 地层参数表格
+    QPushButton* btnLoadVsModel = nullptr; // 载入模型文件按钮
+    QLabel* lblVsSummary = nullptr; // 底部模型状态摘要
+
+    // =====================================================
+    // 7. 顶部工具栏数据看板胶囊标签 (Data Badges)
+    // =====================================================
+    QLabel* lblBadgeFile = nullptr; // 当前文件名
+    QLabel* lblBadgeTraces = nullptr; // 总道数
+    QLabel* lblBadgeDt = nullptr; // 采样率 dt
+    QLabel* lblBadgeTime = nullptr; // 总记录时长
+
+    // =====================================================
+// 8. 底部状态栏地学仪器级状态芯片 (Status Chips)
+// =====================================================
+    QLabel* statusChipHardware = nullptr; // 算力与 AI 引擎状态
+    QLabel* statusChipMethod = nullptr; // 当前算法模式指示灯
+    QLabel* statusChipGrid = nullptr; // 当前计算网格精细度
+    QLabel* statusChipData = nullptr; // 内存地震数据规格
+
+    
+
+    protected:
+        void dragEnterEvent(QDragEnterEvent* event) override;
+        void dragMoveEvent(QDragMoveEvent* event) override;
+        void dropEvent(QDropEvent* event) override;
 };

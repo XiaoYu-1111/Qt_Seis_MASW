@@ -555,8 +555,6 @@ std::vector<std::vector<std::complex<double>>> cwt_morlet_safe(
 #include <unsupported/Eigen/FFT>
 #include <iostream>
 
-
-
 /**
  * @brief 变分模态分解 (VMD)
  * @param signal 输入信号
@@ -713,8 +711,6 @@ std::vector<std::vector<std::complex<double>>> cwt_morlet_safe(
 
 	return result;
 }
-
-
 
 /**
  * @brief 移相法计算面波频散能量谱 (Phase Shift Method - Park et al., 1998)

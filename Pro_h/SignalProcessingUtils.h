@@ -108,7 +108,7 @@ struct VmdResult {
 	 float f_min, float f_max, int nf,
 	 float v_min, float v_max, int nv);
 
- //  Slant-Stack τ−p变换法
+ //  Slant-Stack τ−p变换法 
 
  std::vector<std::vector<float>> computeSlantStackDispersion(
 	 const std::vector<std::vector<float>>& seismicData,

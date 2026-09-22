@@ -100,6 +100,7 @@ Pro_Seis_MASW::Pro_Seis_MASW(QWidget* parent)
     this->setWindowTitle(QStringLiteral("SeisTool-MASW 面波频散分析系统 v1.0"));
     this->setMinimumSize(1100,680);
     this->setStyleSheet(StyleHelper::getDarkScientificStyle());
+    this->setAcceptDrops(true);
     setWindowIcon(QIcon(":/Pro_Seis_WASW/icon/layer.png"));
     resize(1366,800);
 
@@ -108,7 +109,11 @@ Pro_Seis_MASW::Pro_Seis_MASW(QWidget* parent)
     initControlDock();
     initLogDock();
 
-    statusBar()->showMessage(QStringLiteral("就绪 (Ready)"));
+    initStatusBar(); // <--- 调用状态栏初始化
+
+    // 默认触发一次初始状态
+    statusChipMethod->setText(QStringLiteral("<font color='#38bdf8'>●</font> <b>算法</b>: 移相法"));
+    statusChipGrid->setText(QStringLiteral("<font color='#f59e0b'>●</font> <b>网格</b>: 180×250"));
 }
 
 Pro_Seis_MASW::~Pro_Seis_MASW()
@@ -118,39 +123,85 @@ Pro_Seis_MASW::~Pro_Seis_MASW()
 
 void Pro_Seis_MASW::createActionsAndToolBars()
 {
-    // =========================================================
-    // 方案：直接在工具栏嵌入带 #btnPrimary 样式的标准 QPushButton
-    // =========================================================
-    QPushButton* btnOpen = new QPushButton(QStringLiteral("📁 打开 SEGY 数据"), this);
-    btnOpen->setObjectName("btnPrimary");             // 对应我们在 style.h 中定义的蓝底样式
-    btnOpen->setCursor(Qt::PointingHandCursor);       // 鼠标悬停显示“小手”手势
-    btnOpen->setMinimumHeight(32);                    // 设置适中的高度
-    btnOpen->setStyleSheet(
-        "QPushButton#btnPrimary {"
-        "   background-color: #0284c7;"
-        "   border: 1px solid #0369a1;"
-        "   color: #ffffff;"
-        "   font-weight: bold;"
-        "   border-radius: 4px;"
-        "   padding: 4px 16px;"
-        "}"
-        "QPushButton#btnPrimary:hover {"
-        "   background-color: #0369a1;"
-        "}"
-        "QPushButton#btnPrimary:pressed {"
-        "   background-color: #0c4a6e;"
-        "}"
+    ui->mainToolBar->setMovable(false);
+    ui->mainToolBar->setFixedHeight(44); // 适度加高，更显大气
+    ui->mainToolBar->setStyleSheet(
+        "QToolBar { background-color: #0f172a; border-bottom: 1px solid #334155; spacing: 8px; padding: 0 10px; }"
     );
 
-    // 绑定快捷键 Ctrl+O，方便键盘操作
+    // =========================================================
+    // 1. 左侧快捷功能按钮区
+    // =========================================================
+    // A. 打开数据 (主按钮)
+    QPushButton* btnOpen = new QPushButton(QStringLiteral("📁 打开 SEGY 数据"), this);
+    btnOpen->setObjectName("btnPrimary");
+    btnOpen->setCursor(Qt::PointingHandCursor);
+    btnOpen->setMinimumHeight(30);
     btnOpen->setShortcut(QKeySequence::Open);
     btnOpen->setToolTip(QStringLiteral("打开并载入 SEGY 地震道集数据 (Ctrl+O)"));
-
-    // 点击直接触发载入
+    btnOpen->setStyleSheet(
+        "QPushButton#btnPrimary { background-color: #0284c7; border: 1px solid #0369a1; color: white; font-weight: bold; border-radius: 4px; padding: 4px 14px; }"
+        "QPushButton#btnPrimary:hover { background-color: #0369a1; }"
+        "QPushButton#btnPrimary:pressed { background-color: #0c4a6e; }"
+    );
     connect(btnOpen, &QPushButton::clicked, this, &Pro_Seis_MASW::onOpenSegy);
-
-    // 将蓝底按钮加入工具栏
     ui->mainToolBar->addWidget(btnOpen);
+
+    // 按钮通用次级样式
+    QString secBtnStyle =
+        "QPushButton { background-color: #1e293b; border: 1px solid #334155; color: #cbd5e1; border-radius: 4px; padding: 4px 12px; font-size: 12px; min-height: 28px; }"
+        "QPushButton:hover { background-color: #334155; color: white; border-color: #64748b; }"
+        "QPushButton:pressed { background-color: #0f172a; }";
+
+    // B. 全局重置按钮
+    QPushButton* btnReset = new QPushButton(QStringLiteral("🔄 重置视图"), this);
+    btnReset->setCursor(Qt::PointingHandCursor);
+    btnReset->setStyleSheet(secBtnStyle);
+    btnReset->setToolTip(QStringLiteral("将所有页面视图、缩放比例与曲线一键复位"));
+    connect(btnReset, &QPushButton::clicked, this, &Pro_Seis_MASW::onResetAll);
+    ui->mainToolBar->addWidget(btnReset);
+
+    // C. 帮助说明按钮
+    QPushButton* btnHelp = new QPushButton(QStringLiteral("📖 帮助指南"), this);
+    btnHelp->setCursor(Qt::PointingHandCursor);
+    btnHelp->setStyleSheet(secBtnStyle);
+    btnHelp->setToolTip(QStringLiteral("查看 MASW 面波分析理论、系统架构与操作快捷键"));
+    connect(btnHelp, &QPushButton::clicked, this, &Pro_Seis_MASW::onShowHelp);
+    ui->mainToolBar->addWidget(btnHelp);
+
+    // =========================================================
+    // 2. 中间弹簧 (把数据看板推到最右侧)
+    // =========================================================
+    QWidget* spacer = new QWidget(this);
+    spacer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    ui->mainToolBar->addWidget(spacer);
+
+    // =========================================================
+    // 3. 右侧数据看板徽章区 (Data Badges)
+    // =========================================================
+    QString badgeStyle =
+        "QLabel {"
+        "   background-color: #1e293b;"
+        "   border: 1px solid #334155;"
+        "   border-radius: 12px;"
+        "   padding: 2px 10px;"
+        "   color: #94a3b8;"
+        "   font-family: 'Consolas', 'Segoe UI', monospace;"
+        "   font-size: 12px;"
+        "}";
+
+    lblBadgeFile = new QLabel(this); lblBadgeFile->setStyleSheet(badgeStyle);
+    lblBadgeTraces = new QLabel(this); lblBadgeTraces->setStyleSheet(badgeStyle);
+    lblBadgeDt = new QLabel(this); lblBadgeDt->setStyleSheet(badgeStyle);
+    lblBadgeTime = new QLabel(this); lblBadgeTime->setStyleSheet(badgeStyle);
+
+    ui->mainToolBar->addWidget(lblBadgeFile);
+    ui->mainToolBar->addWidget(lblBadgeTraces);
+    ui->mainToolBar->addWidget(lblBadgeDt);
+    ui->mainToolBar->addWidget(lblBadgeTime);
+
+    // 初始化为未载入状态
+    updateDataBadges(QStringLiteral("未载入数据"), 0, 0, 0.0f);
 }
 
 void Pro_Seis_MASW::initUI()
@@ -163,15 +214,76 @@ void Pro_Seis_MASW::initUI()
 
 void Pro_Seis_MASW::initMainTabs()
 {
-    // --- 页面 1: 原始道集容器 (保持不变) ---
+    // =========================================================
+    // --- 页面 1: 原始道集容器 (现代化卡片引导 + 拖拽支持) ---
+    // =========================================================
     seismicViewContainer = new QWidget(this);
+    seismicViewContainer->setAcceptDrops(true); // 开启拖拽支持
+
     QVBoxLayout* contLayout = new QVBoxLayout(seismicViewContainer);
     contLayout->setContentsMargins(0, 0, 0, 0);
 
-    QLabel* emptyLabel = new QLabel(QStringLiteral("请点击顶部【打开 SEGY 数据】载入地震剖面"), seismicViewContainer);
-    emptyLabel->setAlignment(Qt::AlignCenter);
-    emptyLabel->setStyleSheet("color: #64748b; font-size: 16px;");
-    contLayout->addWidget(emptyLabel);
+    // 构建居中卡片容器
+    QWidget* emptyCard = new QWidget(seismicViewContainer);
+    QVBoxLayout* cardLayout = new QVBoxLayout(emptyCard);
+    cardLayout->setAlignment(Qt::AlignCenter);
+    cardLayout->setSpacing(16);
+
+    // 1. 图标与大标题
+    QLabel* lblIcon = new QLabel(QStringLiteral("🌊"), emptyCard);
+    lblIcon->setStyleSheet("font-size: 56px; border: none;");
+    lblIcon->setAlignment(Qt::AlignCenter);
+
+    QLabel* lblTitle = new QLabel(QStringLiteral("暂未载入地震道集数据"), emptyCard);
+    lblTitle->setStyleSheet("color: #f1f5f9; font-size: 20px; font-weight: bold; border: none;");
+    lblTitle->setAlignment(Qt::AlignCenter);
+
+    QLabel* lblSub = new QLabel(QStringLiteral("支持标准 SEG-Y / SGY 二维主动源面波道集 (IEEE / IBM 浮点格式)\n可点击下方按钮选择文件，或直接将 .sgy 文件拖拽至此窗口"), emptyCard);
+    lblSub->setStyleSheet("color: #94a3b8; font-size: 13px; line-height: 1.5; border: none;");
+    lblSub->setAlignment(Qt::AlignCenter);
+
+    // 2. 主操作大按钮
+    QPushButton* btnBigOpen = new QPushButton(QStringLiteral("📂 浏览并打开 SEGY 数据"), emptyCard);
+    btnBigOpen->setCursor(Qt::PointingHandCursor);
+    btnBigOpen->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #0284c7; color: white; font-weight: bold; font-size: 14px;"
+        "   padding: 10px 28px; border-radius: 6px; border: 1px solid #0369a1;"
+        "}"
+        "QPushButton:hover { background-color: #0369a1; }"
+    );
+    connect(btnBigOpen, &QPushButton::clicked, this, &Pro_Seis_MASW::onOpenSegy);
+
+    // 3. 快速试用小标签入口
+    QWidget* demoWidget = new QWidget(emptyCard);
+    QHBoxLayout* demoLayout = new QHBoxLayout(demoWidget);
+    demoLayout->setSpacing(10);
+    demoLayout->setAlignment(Qt::AlignCenter);
+
+    QLabel* lblOr = new QLabel(QStringLiteral("或者快速体验："), demoWidget);
+    lblOr->setStyleSheet("color: #64748b; font-size: 12px; border: none;");
+
+    QPushButton* btnDemoSynthetic = new QPushButton(QStringLiteral("🧪 一键加载理论三层正演模型"), demoWidget);
+    btnDemoSynthetic->setCursor(Qt::PointingHandCursor);
+    btnDemoSynthetic->setStyleSheet(
+        "QPushButton { background-color: #1e293b; color: #38bdf8; border: 1px solid #334155; padding: 4px 12px; border-radius: 4px; font-size: 12px; }"
+        "QPushButton:hover { background-color: #334155; border-color: #38bdf8; }"
+    );
+    connect(btnDemoSynthetic, &QPushButton::clicked, this, &Pro_Seis_MASW::onSyntheticClicked);
+
+    demoLayout->addWidget(lblOr);
+    demoLayout->addWidget(btnDemoSynthetic);
+
+    // 装配进卡片
+    cardLayout->addStretch();
+    cardLayout->addWidget(lblIcon);
+    cardLayout->addWidget(lblTitle);
+    cardLayout->addWidget(lblSub);
+    cardLayout->addWidget(btnBigOpen, 0, Qt::AlignCenter);
+    cardLayout->addWidget(demoWidget, 0, Qt::AlignCenter);
+    cardLayout->addStretch();
+
+    contLayout->addWidget(emptyCard);
 
     // =========================================================
     // --- 页面 2: 频散能量谱 (容器 + 画布 + 底部控制栏) ---
@@ -427,10 +539,106 @@ void Pro_Seis_MASW::initMainTabs()
     plotCurve1D = new Data_show::Plot1D(this);
     plotCurve1D->m_setName(QStringLiteral("频散曲线对比 (Dispersion Curves)"));
 
-    // 将整个容器加入 Tab 2
+    // ---------------------------------------------------------
+    // --- 页面 4: 1D 速度结构剖面展示 (Tab 4: Vs Profile) ---
+    // ---------------------------------------------------------
+    inversionContainer = new QWidget(this);
+    QVBoxLayout* invMainLayout = new QVBoxLayout(inversionContainer);
+    invMainLayout->setContentsMargins(4, 4, 4, 4);
+    invMainLayout->setSpacing(4);
+
+    // 1. 中间主要内容区：左边剖面图，右边地层表格
+    QWidget* contentWidget = new QWidget(inversionContainer);
+    QHBoxLayout* contentLayout = new QHBoxLayout(contentWidget);
+    contentLayout->setContentsMargins(0, 0, 0, 0);
+    contentLayout->setSpacing(8);
+
+    // 左侧：1D 速度阶梯图 (Plot1D)
+    plotVsProfile = new Data_show::Plot1D(contentWidget);
+    plotVsProfile->m_setName(QStringLiteral("一维横波速度结构剖面 (1D Vs Profile)"));
+    plotVsProfile->xAxis->setLabel(QStringLiteral("横波速度 Shear-Wave Velocity Vs (m/s)"));
+    plotVsProfile->yAxis->setLabel(QStringLiteral("地下深度 Depth (m)"));
+    plotVsProfile->yAxis->setRangeReversed(true); // 深度向下递增 (地学标准)
+    contentLayout->addWidget(plotVsProfile, 7);   // 权重 7 (占 70% 宽度)
+
+    // 右侧：地层参数表格 (QTableWidget)
+    // ---------------------------------------------------------
+    // 优化后的右侧地层参数表格 (QTableWidget)
+    // ---------------------------------------------------------
+    tableVsModel = new QTableWidget(contentWidget);
+    tableVsModel->setColumnCount(5);
+    tableVsModel->setHorizontalHeaderLabels({
+        QStringLiteral("层号"), QStringLiteral("厚度(m)"), QStringLiteral("顶深(m)"),
+        QStringLiteral("Vs(m/s)"), QStringLiteral("Vp(m/s)")
+        });
+
+    // 1. 【消除横向滚动条】：让 5 个列均匀拉伸撑满整个表格宽度
+    tableVsModel->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    tableVsModel->verticalHeader()->setVisible(false);
+    tableVsModel->setEditTriggers(QAbstractItemView::NoEditTriggers); // 只读
+    tableVsModel->setSelectionBehavior(QAbstractItemView::SelectRows); // 整行选中
+    tableVsModel->setAlternatingRowColors(true); // 开启隔行换色
+
+    // 2. 【核心修复 QSS】：显式指定奇偶行背景色与高对比文字颜色
+    tableVsModel->setStyleSheet(
+        "QTableWidget {"
+        "   background-color: #0f172a;"             // 奇数行底色 (深黑蓝)
+        "   alternate-background-color: #1e293b;"   // 偶数行底色 (科技灰蓝，解决白底问题！)
+        "   color: #f8fafc;"                        // 单元格文字颜色 (纯亮白，字字清晰)
+        "   gridline-color: #334155;"               // 网格线颜色
+        "   border: 1px solid #334155;"
+        "   font-size: 13px;"
+        "}"
+        "QTableWidget::item {"
+        "   padding: 4px;"
+        "}"
+        "QTableWidget::item:selected {"
+        "   background-color: #0284c7;"             // 鼠标选中整行时的高亮科技蓝
+        "   color: #ffffff;"
+        "}"
+        "QHeaderView::section {"
+        "   background-color: #1e293b;"
+        "   color: #38bdf8;"                        // 表头天蓝色标题
+        "   font-weight: bold;"
+        "   font-size: 13px;"
+        "   border: 1px solid #334155;"
+        "   height: 30px;"
+        "}"
+    );
+
+    contentLayout->addWidget(tableVsModel, 3); // 权重 3
+
+    invMainLayout->addWidget(contentWidget, 1);
+
+    // 2. 底部控制栏
+    QFrame* invBottomBar = new QFrame(inversionContainer);
+    invBottomBar->setFixedHeight(42);
+    invBottomBar->setStyleSheet("QFrame { background-color: #0f172a; border-top: 1px solid #334155; }");
+    QHBoxLayout* invBarLayout = new QHBoxLayout(invBottomBar);
+    invBarLayout->setContentsMargins(15, 0, 15, 0);
+    invBarLayout->setSpacing(12);
+
+    lblVsSummary = new QLabel(QStringLiteral("暂未载入反演地层模型"), invBottomBar);
+    lblVsSummary->setStyleSheet("color: #38bdf8; font-family: Consolas; font-size: 12px;");
+
+    btnLoadVsModel = new QPushButton(QStringLiteral("📂 载入反演模型文件 (*.txt)"), invBottomBar);
+    btnLoadVsModel->setStyleSheet(
+        "QPushButton { background-color: #0284c7; color: white; font-weight: bold; padding: 5px 14px; border-radius: 4px; }"
+        "QPushButton:hover { background-color: #0369a1; }"
+    );
+    connect(btnLoadVsModel, &QPushButton::clicked, this, &Pro_Seis_MASW::onLoadInversionModel);
+
+    invBarLayout->addWidget(lblVsSummary);
+    invBarLayout->addStretch();
+    invBarLayout->addWidget(btnLoadVsModel);
+
+    invMainLayout->addWidget(invBottomBar, 0);
+
+    // 将四个标签页统一加入主窗口
     mainTabWidget->addTab(seismicViewContainer, QStringLiteral("1. 原始道集 (Shot Gather)"));
     mainTabWidget->addTab(dispersionContainer, QStringLiteral("2. 频散能量谱 (Dispersion Map)"));
     mainTabWidget->addTab(plotCurve1D, QStringLiteral("3. 频散曲线 (Extracted Curves)"));
+    mainTabWidget->addTab(inversionContainer, QStringLiteral("4. 速度结构 (Vs Profile)")); // <--- 新增 Tab 4
 }
 
 void Pro_Seis_MASW::initControlDock()
@@ -497,6 +705,24 @@ void Pro_Seis_MASW::initControlDock()
     comboGridQuality->addItem(QStringLiteral("标准质量 (180 × 250 - 推荐)"), QPoint(180, 250));
     comboGridQuality->addItem(QStringLiteral("高精度 (300 × 500 - 精细)"), QPoint(300, 500));
     comboGridQuality->setCurrentIndex(1); // 默认选择【标准质量】
+
+    // A. 算法模式变动时，自动更新底部芯片
+    connect(comboMethod, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [=](int index) {
+        QString methodName = comboMethod->currentText();
+        // 简化名字展示
+        if (methodName.contains("移相法")) methodName = "移相法";
+        else if (methodName.contains("F-K")) methodName = "F-K变换";
+        else if (methodName.contains("MVDR")) methodName = "Capon/MVDR";
+        else if (methodName.contains("倾斜叠加")) methodName = "Slant-Stack";
+
+        statusChipMethod->setText(QString("<font color='#38bdf8'>●</font> <b>算法</b>: %1").arg(methodName));
+        });
+
+    // B. 网格质量变动时，自动更新底部芯片
+    connect(comboGridQuality, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [=]() {
+        QPoint pt = comboGridQuality->currentData().toPoint();
+        statusChipGrid->setText(QString("<font color='#f59e0b'>●</font> <b>网格</b>: %1×%2").arg(pt.x()).arg(pt.y()));
+        });
 
     spinFmin = new QDoubleSpinBox(scanGroup);
     spinFmin->setRange(0.1, 500.0);
@@ -732,7 +958,57 @@ void Pro_Seis_MASW::initLogDock()
 // =========================================================
 // 读取 SEGY 并嵌入显示
 // =========================================================
+// ---------------------------------------------------------
+// 核心：统一的 SEGY 解析与载入函数 (拖拽和按钮共用)
+// ---------------------------------------------------------
+void Pro_Seis_MASW::loadSegyFile(const QString& filePath)
+{
+    if (filePath.isEmpty() || !QFile::exists(filePath)) return;
 
+    QString timeStr = QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss"));
+    textLog->append(QStringLiteral("[%1] 正在载入数据: %2").arg(timeStr).arg(filePath));
+
+    // 1. 读取数据
+    m_seismicData = SeismicIO::readSegyFile2D(filePath.toStdString());
+
+
+    if (m_seismicData.empty() || m_seismicData[0].empty()) {
+        QMessageBox::critical(this, QStringLiteral("错误"), QStringLiteral("SEGY 读取失败或数据为空！"));
+        return;
+    }
+
+    int traces = m_seismicData.size();
+    int samples = m_seismicData[0].size();
+    float dt = static_cast<float>(spinDt->value() / 1000.0);
+
+    textLog->append(QStringLiteral("[%1] 读取成功! 总道数: %2, 每道采样点: %3")
+        .arg(QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss")))
+        .arg(traces)
+        .arg(samples));
+
+    // 实时点亮顶部数据看板
+    updateDataBadges(QFileInfo(filePath).fileName(), traces, samples, dt * 1000.0f);
+    statusChipData->setText(QString("<font color='#10b981'>●</font> <b>数据</b>: %1道×%2点").arg(traces).arg(samples));
+
+    // 2. 调用 SeismicView2D 模块生成视图组件并嵌入 Tab 1
+    QWidget* seismicPlotWidget = createSeismicView(m_seismicData, QStringLiteral("道集剖面"), seismicViewContainer, dt);
+
+    // 清空页面 1 原有内容（卡片）并填入新视图
+    QLayout* layout = seismicViewContainer->layout();
+    QLayoutItem* item;
+    while ((item = layout->takeAt(0)) != nullptr) {
+        if (item->widget()) delete item->widget();
+        delete item;
+    }
+    layout->addWidget(seismicPlotWidget);
+
+    // 自动切到第 1 页
+    mainTabWidget->setCurrentIndex(0);
+}
+
+// ---------------------------------------------------------
+// 按钮点击：只需弹窗选路径，然后交给 loadSegyFile 执行
+// ---------------------------------------------------------
 void Pro_Seis_MASW::onOpenSegy()
 {
     QString fileName = QFileDialog::getOpenFileName(
@@ -742,41 +1018,9 @@ void Pro_Seis_MASW::onOpenSegy()
         QStringLiteral("SEGY 地震数据 (*.sgy *.segy *.dat);;所有文件 (*.*)")
     );
 
-    if (fileName.isEmpty()) return;
-
-    QString timeStr = QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss"));
-    textLog->append(QStringLiteral("[%1] 正在读取文件: %2").arg(timeStr).arg(fileName));
-
-    // 1. 调用模块读取数据
-    m_seismicData = SeismicIO::readSegyFile2D(fileName.toStdString());
-
-    if (m_seismicData.empty() || m_seismicData[0].empty()) {
-        QMessageBox::critical(this, QStringLiteral("错误"), QStringLiteral("SEGY 读取失败或数据为空！"));
-        return;
+    if (!fileName.isEmpty()) {
+        loadSegyFile(fileName);
     }
-
-    int traces = m_seismicData.size();
-    int samples = m_seismicData[0].size();
-
-    textLog->append(QStringLiteral("[%1] 读取成功! 总道数: %2, 每道采样点数: %3")
-        .arg(QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss")))
-        .arg(traces)
-        .arg(samples));
-
-    // 2. 调用 SeismicView2D 模块生成视图组件并嵌入 Tab 1
-    QWidget* seismicPlotWidget = createSeismicView(m_seismicData, QStringLiteral("道集剖面"), seismicViewContainer);
-
-    // 清空页面 1 原有内容并填入新视图
-    QLayout* layout = seismicViewContainer->layout();
-    QLayoutItem* item;
-    while ((item = layout->takeAt(0)) != nullptr) {
-        if (item->widget()) delete item->widget();
-        delete item;
-    }
-    layout->addWidget(seismicPlotWidget);
-
-    // 切换到第 1 页
-    mainTabWidget->setCurrentIndex(0);
 }
 
 void Pro_Seis_MASW::onCalculateClicked()
@@ -1286,6 +1530,10 @@ void Pro_Seis_MASW::onSyntheticClicked()
         .arg(h1).arg(h2)
         .arg(vs1).arg(vs2).arg(vs3)
         .arg(fm));
+
+    // 理论数据点亮看板
+    updateDataBadges(QStringLiteral("三层介质理论正演模型"), nTraces, 1000, dt * 1000.0f);
+    statusChipData->setText(QStringLiteral("<font color='#10b981'>●</font> <b>数据</b>: 96道×1000点 (正演)"));
 }
 
 void Pro_Seis_MASW::onStartDatasetGeneration()
@@ -1562,5 +1810,328 @@ void Pro_Seis_MASW::onAiPickClicked()
     }
     catch (const std::exception& e) {
         QMessageBox::critical(this, QStringLiteral("ONNX 推理异常"), QString::fromLocal8Bit(e.what()));
+    }
+}
+
+void Pro_Seis_MASW::onLoadInversionModel()
+{
+    QString defaultPath = QCoreApplication::applicationDirPath() + "/../../Pro_Seis_MASW/pro_data/output_curve/Inverted_Vs_Model.txt";
+    if (!QFile::exists(defaultPath)) {
+        defaultPath = QCoreApplication::applicationDirPath();
+    }
+
+    QString fileName = QFileDialog::getOpenFileName(
+        this,
+        QStringLiteral("选择反演地层模型文件"),
+        defaultPath,
+        QStringLiteral("地层模型文本 (*.txt);;所有文件 (*.*)")
+    );
+
+    if (fileName.isEmpty()) return;
+
+    displayInversionModel(fileName);
+}
+
+void Pro_Seis_MASW::displayInversionModel(const QString& filePath)
+{
+    QFile file(filePath);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        QMessageBox::warning(this, QStringLiteral("错误"), QStringLiteral("无法读取模型文件：\n") + file.errorString());
+        return;
+    }
+
+    struct LayerInfo {
+        int layer;
+        double thk;
+        double depthTop;
+        double vs;
+        double vp;
+    };
+
+    QVector<LayerInfo> layers;
+    QTextStream in(&file);
+
+    while (!in.atEnd()) {
+        QString line = in.readLine().trimmed();
+        if (line.isEmpty() || line.startsWith("#")) continue;
+
+        QStringList tokens = line.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+        if (tokens.size() >= 5) {
+            LayerInfo info;
+            info.layer = tokens[0].toInt();
+            info.thk = tokens[1].toDouble();
+            info.depthTop = tokens[2].toDouble();
+            info.vs = tokens[3].toDouble();
+            info.vp = tokens[4].toDouble();
+            layers.append(info);
+        }
+    }
+    file.close();
+
+    if (layers.isEmpty()) {
+        QMessageBox::warning(this, QStringLiteral("警告"), QStringLiteral("未在文件中解析出有效的地层数据！"));
+        return;
+    }
+
+    // =========================================================
+    // 1. 构建垂直阶梯剖面坐标 (X: Vs, Y: Depth)
+    // =========================================================
+    std::vector<double> x_vs;
+    std::vector<double> y_depth;
+
+    tableVsModel->setRowCount(layers.size());
+
+    double maxDepth = 0.0;
+    for (int i = 0; i < layers.size(); ++i) {
+        const auto& l = layers[i];
+
+        // 填充右侧表格
+        tableVsModel->setItem(i, 0, new QTableWidgetItem(QString::number(l.layer)));
+        tableVsModel->setItem(i, 1, new QTableWidgetItem(l.thk > 0 ? QString::number(l.thk, 'f', 1) : QStringLiteral("无限")));
+        tableVsModel->setItem(i, 2, new QTableWidgetItem(QString::number(l.depthTop, 'f', 1)));
+        tableVsModel->setItem(i, 3, new QTableWidgetItem(QString::number(l.vs, 'f', 1)));
+        tableVsModel->setItem(i, 4, new QTableWidgetItem(QString::number(l.vp, 'f', 1)));
+
+        // 表格文字居中
+        for (int c = 0; c < 5; ++c) {
+            tableVsModel->item(i, c)->setTextAlignment(Qt::AlignCenter);
+        }
+
+        // 计算该层顶底深度
+        double zTop = l.depthTop;
+        double zBottom = (l.thk > 0) ? (zTop + l.thk) : (zTop + 12.0); // 最后一层半空间向下延伸 12m
+
+        maxDepth = std::max(maxDepth, zBottom);
+
+        // 构造垂直台阶点对：(Vs, zTop) -> (Vs, zBottom)
+        x_vs.push_back(l.vs);
+        y_depth.push_back(zTop);
+
+        x_vs.push_back(l.vs);
+        y_depth.push_back(zBottom);
+    }
+
+    // =========================================================
+    // 2. 绘制 1D 阶梯折线 (在 Plot1D 上)
+    // =========================================================
+    plotVsProfile->setData(x_vs, y_depth, QStringLiteral("反演横波速度剖面 (Inverted Vs)"));
+
+    // 设置阶梯曲线样式：深蓝色粗线条
+    // 隐藏折线上的圆圈散点，改为纯净的平滑阶梯线
+    if (plotVsProfile->graphCount() > 0) {
+        plotVsProfile->graph(0)->setName(QStringLiteral("反演地层模型 (Inverted)"));
+        plotVsProfile->graph(0)->setScatterStyle(QCPScatterStyle::ssNone); // 去除折点圆圈
+        QPen p(QColor(2, 132, 199), 2.5);
+        plotVsProfile->graph(0)->setPen(p);
+    }
+
+    // 坐标轴范围自适应
+    plotVsProfile->xAxis->setLabel(QStringLiteral("横波速度 Vs (m/s)"));
+    plotVsProfile->yAxis->setLabel(QStringLiteral("地下深度 Depth (m)"));
+    plotVsProfile->yAxis->setRangeReversed(true); // 保证深度向下为正
+
+    double vsMin = *std::min_element(x_vs.begin(), x_vs.end());
+    double vsMax = *std::max_element(x_vs.begin(), x_vs.end());
+    plotVsProfile->xAxis->setRange(vsMin - 40.0, vsMax + 40.0);
+    plotVsProfile->yAxis->setRange(0.0, maxDepth);
+
+    plotVsProfile->replot();
+
+    // 3. 更新底栏摘要
+    lblVsSummary->setText(QStringLiteral("已成功载入: %1 层模型 | 探测最大深度: %2 m | 基底 Vs: %3 m/s")
+        .arg(layers.size())
+        .arg(maxDepth, 0, 'f', 1)
+        .arg(layers.last().vs, 0, 'f', 1));
+
+    textLog->append(QStringLiteral("[%1] 速度剖面展示就绪: 成功读取反演地质模型 %2，共 %3 层。")
+        .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
+        .arg(QFileInfo(filePath).fileName())
+        .arg(layers.size()));
+
+    // 自动切换到 Tab 4
+    mainTabWidget->setCurrentWidget(inversionContainer);
+}
+
+// ---------------------------------------------------------
+// 刷新右侧数据看板胶囊标签
+// ---------------------------------------------------------
+void Pro_Seis_MASW::updateDataBadges(const QString& fileName, int traces, int samples, float dtMs)
+{
+    if (traces <= 0 || samples <= 0) {
+        lblBadgeFile->setText(QStringLiteral("⚪ 状态: 等待载入数据"));
+        lblBadgeTraces->setVisible(false);
+        lblBadgeDt->setVisible(false);
+        lblBadgeTime->setVisible(false);
+        return;
+    }
+
+    lblBadgeTraces->setVisible(true);
+    lblBadgeDt->setVisible(true);
+    lblBadgeTime->setVisible(true);
+
+    float totalTimeMs = (samples - 1) * dtMs;
+
+    lblBadgeFile->setText(QString("📁 文件: <font color='#38bdf8'><b>%1</b></font>").arg(fileName));
+    lblBadgeTraces->setText(QString("📊 道数: <font color='#38bdf8'><b>%1</b></font> 道").arg(traces));
+    lblBadgeDt->setText(QString("⏱ dt: <font color='#38bdf8'><b>%1</b></font> ms").arg(dtMs, 0, 'f', 2));
+    lblBadgeTime->setText(QString("⏳ 时长: <font color='#38bdf8'><b>%1</b></font> ms").arg(totalTimeMs, 0, 'f', 1));
+}
+
+// ---------------------------------------------------------
+// 一键重置全部视图
+// ---------------------------------------------------------
+void Pro_Seis_MASW::onResetAll()
+{
+    // 复位频散谱视图
+    if (plotDispersion) {
+        if (m_dispFmax > m_dispFmin && m_dispVmax > m_dispVmin) {
+            plotDispersion->xAxis->setRange(m_dispFmin, m_dispFmax);
+            plotDispersion->yAxis->setRange(m_dispVmin, m_dispVmax);
+        }
+        else {
+            plotDispersion->rescaleAxes();
+        }
+        plotDispersion->replot();
+    }
+    // 复位频散曲线视图
+    if (plotCurve1D) {
+        plotCurve1D->rescaleAxes();
+        plotCurve1D->replot();
+    }
+    // 复位速度剖面视图
+    if (plotVsProfile) {
+        plotVsProfile->rescaleAxes();
+        plotVsProfile->replot();
+    }
+
+    textLog->append(QStringLiteral("[%1] 🔄 所有图表视图已一键复位。")
+        .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+}
+
+// ---------------------------------------------------------
+// 帮助与说明弹窗
+// ---------------------------------------------------------
+void Pro_Seis_MASW::onShowHelp()
+{
+    QMessageBox::about(this, QStringLiteral("SeisTool-MASW 系统指南"),
+        QStringLiteral("<h3>SeisTool-MASW 面波频散分析系统 v1.0</h3>"
+            "<p>本系统用于近地表工程面波（MASW）高精度频散分析、理论正演与反演。</p>"
+            "<b>核心工作流：</b>"
+            "<ol>"
+            "<li><b>Tab 1 原始道集</b>：拖拽或打开 SEGY 数据，Wiggle 与灰度剖面实时渲染；</li>"
+            "<li><b>Tab 2 频散能量谱</b>：支持移相法、F-K法、高分辨率 MVDR、倾斜叠加法，点击【AI 智能拾取】一键成线；</li>"
+            "<li><b>Tab 3 频散曲线</b>：期刊级曲线对比，支持导出反演所需 ASCII 数据；</li>"
+            "<li><b>Tab 4 速度结构</b>：1D 横波速度 (Vs) 阶梯剖面展示与地层分层表格。</li>"
+            "</ol>"
+            "<b>操作小贴士：</b>"
+            "<ul>"
+            "<li>支持直接从桌面拖拽 .sgy 文件至窗口快速载入；</li>"
+            "<li>频散谱右键支持重置、切换清晰色块 / 平滑插值，以及导出 SEGY；</li>"
+            "<li>快捷键：<b>Ctrl+O</b> 打开数据 | <b>Ctrl+R</b> 开始计算。</li>"
+            "</ul>"));
+}
+
+void Pro_Seis_MASW::initStatusBar()
+{
+    // 1. 状态栏底层深色仪器面板样式
+    ui->statusBar->setFixedHeight(32);
+    ui->statusBar->setStyleSheet(
+        "QStatusBar {"
+        "   background-color: #0b1120;"          // 深蓝黑底色 (终端感)
+        "   color: #94a3b8;"                     // 默认提示文字为柔和灰
+        "   border-top: 1px solid #1e293b;"      // 极细顶部分割线
+        "   font-size: 12px;"
+        "}"
+        "QStatusBar::item {"
+        "   border: none;"                       // 去除 Qt 默认的白色竖线分割
+        "}"
+    );
+
+    // 2. 胶囊芯片通用微光样式
+    QString chipStyle =
+        "QLabel {"
+        "   background-color: #0f172a;"
+        "   border: 1px solid #334155;"
+        "   border-radius: 11px;"
+        "   padding: 2px 10px;"
+        "   color: #cbd5e1;"
+        "   font-family: 'Consolas', 'Segoe UI', monospace;"
+        "   font-size: 11px;"
+        "   margin-left: 6px;"
+        "}";
+
+    // 芯片 1: 算力与硬件状态
+    statusChipHardware = new QLabel(this);
+    statusChipHardware->setStyleSheet(chipStyle);
+    statusChipHardware->setText(QStringLiteral("<font color='#10b981'>●</font> <b>引擎</b>: CPU多核/ONNX就绪"));
+
+    // 芯片 2: 当前算法模式
+    statusChipMethod = new QLabel(this);
+    statusChipMethod->setStyleSheet(chipStyle);
+    statusChipMethod->setText(QStringLiteral("<font color='#38bdf8'>●</font> <b>算法</b>: 移相法"));
+
+    // 芯片 3: 当前计算网格
+    statusChipGrid = new QLabel(this);
+    statusChipGrid->setStyleSheet(chipStyle);
+    statusChipGrid->setText(QStringLiteral("<font color='#f59e0b'>●</font> <b>网格</b>: 180×250"));
+
+    // 芯片 4: 当前道集规格
+    statusChipData = new QLabel(this);
+    statusChipData->setStyleSheet(chipStyle);
+    statusChipData->setText(QStringLiteral("<font color='#64748b'>○</font> <b>数据</b>: 未载入"));
+
+    // 3. 通过 addPermanentWidget 将芯片永久锚定在状态栏右侧
+    ui->statusBar->addPermanentWidget(statusChipData);
+    ui->statusBar->addPermanentWidget(statusChipMethod); 
+    ui->statusBar->addPermanentWidget(statusChipGrid);
+    ui->statusBar->addPermanentWidget(statusChipHardware);
+
+    ui->statusBar->showMessage(QStringLiteral("就绪 (Ready)"));
+}
+
+// 1. 鼠标拖拽进入窗口时触发：校验文件格式并放行
+void Pro_Seis_MASW::dragEnterEvent(QDragEnterEvent* event)
+{
+    if (event->mimeData()->hasUrls()) {
+        QList<QUrl> urls = event->mimeData()->urls();
+        if (!urls.isEmpty()) {
+            QString file = urls.first().toLocalFile();
+            if (file.endsWith(".sgy", Qt::CaseInsensitive) ||
+                file.endsWith(".segy", Qt::CaseInsensitive) ||
+                file.endsWith(".dat", Qt::CaseInsensitive))
+            {
+                event->acceptProposedAction(); // 接受拖入，光标变为可放置状态
+                return;
+            }
+        }
+    }
+    event->ignore();
+}
+
+// 2. 【核心修复】：鼠标在窗口内晃动时必须持续接受，否则 Windows 会出现禁止圆圈 🚫
+void Pro_Seis_MASW::dragMoveEvent(QDragMoveEvent* event)
+{
+    if (event->mimeData()->hasUrls()) {
+        event->acceptProposedAction();
+    }
+    else {
+        event->ignore();
+    }
+}
+
+// 3. 鼠标松开释放时触发：提取路径并直接加载
+void Pro_Seis_MASW::dropEvent(QDropEvent* event)
+{
+    const QMimeData* mimeData = event->mimeData();
+    if (mimeData->hasUrls()) {
+        QList<QUrl> urls = mimeData->urls();
+        if (!urls.isEmpty()) {
+            QString filePath = urls.first().toLocalFile();
+            if (!filePath.isEmpty()) {
+                event->acceptProposedAction();
+                // 直接调用统一加载函数！
+                loadSegyFile(filePath);
+            }
+        }
     }
 }
