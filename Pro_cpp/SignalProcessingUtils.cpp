@@ -858,3 +858,296 @@ std::vector<std::vector<std::complex<double>>> cwt_morlet_safe(
 
 	return dispersionEnergy;
 }
+//Fk变换法
+
+std::vector<std::vector<float>> computeFKDispersion(
+	const std::vector<std::vector<float>>& seismicData,
+	float dt, float dx,
+	float f_min, float f_max, int nf,
+	float v_min, float v_max, int nv)
+{
+	int nTraces = seismicData.size();
+	if (nTraces < 2 || seismicData[0].empty()) return {};
+	int nt = seismicData[0].size();
+	const double PI = 3.14159265358979323846;
+
+	// 1. 时间向补零 FFT
+	int nfft_t = 1;
+	while (nfft_t < nt) nfft_t <<= 1;
+	if (nfft_t < 2048) nfft_t = 2048;
+
+	double df = 1.0 / (nfft_t * dt);
+	int nFreqBins = nfft_t / 2 + 1;
+
+	Eigen::FFT<double> fft_t;
+	// 存储时间变换后的 F-X 域数据: [nTraces][nFreqBins]
+	std::vector<std::vector<std::complex<double>>> fxData(nTraces, std::vector<std::complex<double>>(nFreqBins));
+
+#pragma omp parallel for
+	for (int tr = 0; tr < nTraces; ++tr) {
+		std::vector<double> timePad(nfft_t, 0.0);
+		for (int t = 0; t < nt; ++t) timePad[t] = seismicData[tr][t];
+
+		std::vector<std::complex<double>> fwdOut;
+		fft_t.fwd(fwdOut, timePad);
+
+		for (int k = 0; k < nFreqBins; ++k) {
+			fxData[tr][k] = fwdOut[k]; // F-K 经典算法保留真实物理振幅
+		}
+	}
+
+	// 2. 空间向构建 F-K 谱并映射回 (f, v)
+	std::vector<std::vector<float>> fkEnergy(nv, std::vector<float>(nf, 0.0f));
+	float df_scan = (f_max - f_min) / std::max(1, nf - 1);
+	float dv_scan = (v_max - v_min) / std::max(1, nv - 1);
+
+#pragma omp parallel for schedule(dynamic)
+	for (int fi = 0; fi < nf; ++fi) {
+		double cur_f = f_min + fi * df_scan;
+		if (cur_f <= 0.0) continue;
+
+		// 频域线性插值系数
+		double k_float = cur_f / df;
+		int k0 = std::clamp((int)std::floor(k_float), 0, nFreqBins - 2);
+		int k1 = k0 + 1;
+		double alpha = k_float - k0;
+
+		// 提取当前频率在各道的复数振幅
+		std::vector<std::complex<double>> cur_fx(nTraces);
+		for (int tr = 0; tr < nTraces; ++tr) {
+			cur_fx[tr] = (1.0 - alpha) * fxData[tr][k0] + alpha * fxData[tr][k1];
+		}
+
+		double omega = 2.0 * PI * cur_f;
+
+		for (int vi = 0; vi < nv; ++vi) {
+			double cur_v = v_min + vi * dv_scan;
+			if (cur_v <= 0.0) continue;
+
+			// 经典空间波数 k = omega / v
+			double k_wave = omega / cur_v;
+
+			// 空间离散傅里叶变换积分 (空间积分等价于空间向 FFT 在特定 k 的采样)
+			std::complex<double> fkSum(0.0, 0.0);
+			for (int tr = 0; tr < nTraces; ++tr) {
+				double x_pos = tr * dx;
+				double phase = k_wave * x_pos;
+				std::complex<double> spatialFactor(std::cos(phase), std::sin(phase));
+				fkSum += cur_fx[tr] * spatialFactor;
+			}
+
+			fkEnergy[vi][fi] = static_cast<float>(std::abs(fkSum));
+		}
+	}
+
+	return fkEnergy;
+}
+//MVDR
+
+std::vector<std::vector<float>> computeCaponMVDRDispersion(
+	const std::vector<std::vector<float>>& seismicData,
+	float dt, float dx,
+	float f_min, float f_max, int nf,
+	float v_min, float v_max, int nv)
+{
+	int nTraces = seismicData.size();
+	if (nTraces < 8 || seismicData[0].empty()) return {};
+	int nt = seismicData[0].size();
+	const double PI = 3.14159265358979323846;
+
+	// 1. 时间向补零 FFT (与移相法完全保持一致)
+	int nfft_t = 1;
+	while (nfft_t < nt) nfft_t <<= 1;
+	if (nfft_t < 2048) nfft_t = 2048;
+
+	double df = 1.0 / (nfft_t * dt);
+	int nFreqBins = nfft_t / 2 + 1;
+	Eigen::FFT<double> fft_t;
+
+	std::vector<std::vector<std::complex<double>>> fxData(nTraces, std::vector<std::complex<double>>(nFreqBins));
+#pragma omp parallel for
+	for (int tr = 0; tr < nTraces; ++tr) {
+		std::vector<double> timePad(nfft_t, 0.0);
+		for (int t = 0; t < nt; ++t) timePad[t] = seismicData[tr][t];
+
+		std::vector<std::complex<double>> fwdOut;
+		fft_t.fwd(fwdOut, timePad);
+		for (int k = 0; k < nFreqBins; ++k) {
+			double mag = std::abs(fwdOut[k]);
+			fxData[tr][k] = (mag > 1e-12) ? (fwdOut[k] / mag) : std::complex<double>(0.0, 0.0);
+		}
+	}
+
+	// =========================================================
+	// 2. 空间子阵列参数设置 (确保满秩: L <= N/2)
+	// =========================================================
+	int L = std::clamp(int(nTraces / 2), 4, 64); // 子阵列长度取总道数一半 (如96道取48)
+	int M = nTraces - L + 1;                     // 子阵列滑动次数 (M >= L 保证满秩)
+
+	std::vector<std::vector<float>> caponEnergy(nv, std::vector<float>(nf, 0.0f));
+	float df_scan = (f_max - f_min) / std::max(1, nf - 1);
+	float dv_scan = (v_max - v_min) / std::max(1, nv - 1);
+
+#pragma omp parallel for schedule(dynamic)
+	for (int fi = 0; fi < nf; ++fi) {
+		double cur_f = f_min + fi * df_scan;
+		if (cur_f <= 0.0) continue;
+
+		// 频域相邻点线性加权插值
+		double k_float = cur_f / df;
+		int k0 = std::clamp((int)std::floor(k_float), 0, nFreqBins - 2);
+		int k1 = k0 + 1;
+		double alpha = k_float - k0;
+
+		Eigen::VectorXcd x_full(nTraces);
+		for (int tr = 0; tr < nTraces; ++tr) {
+			std::complex<double> val = (1.0 - alpha) * fxData[tr][k0] + alpha * fxData[tr][k1];
+			double mag = std::abs(val);
+			x_full(tr) = (mag > 1e-12) ? (val / mag) : std::complex<double>(0.0, 0.0);
+		}
+
+		// =========================================================
+		// 3. 构建前向-后向双向空间平滑协方差矩阵 (FBSS)
+		// =========================================================
+		// A. 前向滑动平滑 Rf
+		Eigen::MatrixXcd Rf = Eigen::MatrixXcd::Zero(L, L);
+		for (int m = 0; m < M; ++m) {
+			Eigen::VectorXcd x_sub = x_full.segment(m, L);
+			Rf += x_sub * x_sub.adjoint();
+		}
+		Rf /= double(M);
+
+		// B. 后向空间平滑 Rb = J * conj(Rf) * J (消除相干信号干扰)
+		Eigen::MatrixXcd Rb = Rf.conjugate().colwise().reverse().rowwise().reverse();
+
+		// C. 双向平均
+		Eigen::MatrixXcd R = 0.5 * (Rf + Rb);
+
+		// =========================================================
+		// 4. 稳健对角加载 (Diagonal Loading, 加 3% 白噪声提高条件数)
+		// =========================================================
+		double trace_R = R.trace().real();
+		double epsilon = 0.03 * (trace_R / L);
+		R += epsilon * Eigen::MatrixXcd::Identity(L, L);
+
+		// 5. 协方差矩阵求逆 R^{-1} (在此频率下仅需计算一次)
+		Eigen::MatrixXcd R_inv = R.inverse();
+
+		double omega = 2.0 * PI * cur_f;
+
+		// =========================================================
+		// 6. 速度扫描成像
+		// =========================================================
+		for (int vi = 0; vi < nv; ++vi) {
+			double cur_v = v_min + vi * dv_scan;
+			if (cur_v <= 0.0) continue;
+
+			double k_wave = omega / cur_v;
+
+			// 构造导向矢量 a (注意：物理走时延迟符号必须为负号 -k*x !)
+			Eigen::VectorXcd a(L);
+			for (int l = 0; l < L; ++l) {
+				double dist = l * dx;
+				double phase = -k_wave * dist; // <--- 【核心修复】：必须带负号！
+				a(l) = std::complex<double>(std::cos(phase), std::sin(phase));
+			}
+
+			// 计算二次型分母 a^H * R^{-1} * a
+			// 采用显式矩阵乘法避免 Eigen .dot() 的歧义
+			double denom = (a.adjoint() * R_inv * a).value().real();
+
+			// Capon 功率输出 (分母越小说明与信号越匹配，能量越强)
+			if (denom > 1e-12) {
+				caponEnergy[vi][fi] = static_cast<float>(1.0 / denom);
+			}
+			else {
+				caponEnergy[vi][fi] = 0.0f;
+			}
+		}
+	}
+
+	return caponEnergy;
+}
+
+std::vector<std::vector<float>> computeSlantStackDispersion(
+	const std::vector<std::vector<float>>& seismicData,
+	float dt, float dx, float x0,
+	float f_min, float f_max, int nf,
+	float v_min, float v_max, int nv)
+{
+	int nTraces = seismicData.size();
+	if (nTraces < 2 || seismicData[0].empty()) return {};
+	int nt = seismicData[0].size();
+	const double PI = 3.14159265358979323846;
+
+	// 1. FFT 补零长度准备
+	int nfft_tau = 1;
+	while (nfft_tau < nt) nfft_tau <<= 1;
+	if (nfft_tau < 2048) nfft_tau = 2048;
+
+	double df_fft = 1.0 / (nfft_tau * dt);
+	int nFreqBins = nfft_tau / 2 + 1;
+	Eigen::FFT<double> fft_tau;
+
+	// 2. 扫描参数准备
+	std::vector<std::vector<float>> tauPEnergy(nv, std::vector<float>(nf, 0.0f));
+	float df_scan = (f_max - f_min) / std::max(1, nf - 1);
+	float dv_scan = (v_max - v_min) / std::max(1, nv - 1);
+
+	// =========================================================
+	// 3. 对各个相速度 v (慢度 p = 1/v) 执行时域倾斜叠加 + 1D FFT
+	// =========================================================
+#pragma omp parallel for schedule(dynamic)
+	for (int vi = 0; vi < nv; ++vi) {
+		double cur_v = v_min + vi * dv_scan;
+		if (cur_v <= 0.0) continue;
+
+		double p_slowness = 1.0 / cur_v; // 水平慢度 (s/m)
+
+		// A. 构建一条长度为 nt 的截距时间道 u(tau, p)
+		std::vector<double> tau_trace(nfft_tau, 0.0);
+
+		for (int k_tau = 0; k_tau < nt; ++k_tau) {
+			double tau = k_tau * dt;
+			double sum_val = 0.0;
+
+			for (int tr = 0; tr < nTraces; ++tr) {
+				double dist = x0 + tr * dx; // 物理偏移距
+				double t_arr = tau + p_slowness * dist; // 走时斜线方程
+
+				// 分数走时点的高精度线性插值
+				double sample_idx = t_arr / dt;
+				int i0 = static_cast<int>(std::floor(sample_idx));
+				int i1 = i0 + 1;
+
+				if (i0 >= 0 && i1 < nt) {
+					double frac = sample_idx - i0;
+					double val = (1.0 - frac) * seismicData[tr][i0] + frac * seismicData[tr][i1];
+					sum_val += val;
+				}
+			}
+			tau_trace[k_tau] = sum_val / nTraces;
+		}
+
+		// B. 沿截距时间 tau 方向做一维实数 FFT -> U(f, p)
+		std::vector<std::complex<double>> tau_fft;
+		fft_tau.fwd(tau_fft, tau_trace);
+
+		// C. 提取目标频率点 f 处的振幅模长
+		for (int fi = 0; fi < nf; ++fi) {
+			double cur_f = f_min + fi * df_scan;
+			if (cur_f <= 0.0) continue;
+
+			// 频域相邻两点线性插值
+			double k_float = cur_f / df_fft;
+			int k0 = std::clamp(static_cast<int>(std::floor(k_float)), 0, nFreqBins - 2);
+			int k1 = k0 + 1;
+			double alpha = k_float - k0;
+
+			std::complex<double> spec_val = (1.0 - alpha) * tau_fft[k0] + alpha * tau_fft[k1];
+			tauPEnergy[vi][fi] = static_cast<float>(std::abs(spec_val));
+		}
+	}
+
+	return tauPEnergy;
+}

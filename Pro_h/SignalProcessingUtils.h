@@ -93,3 +93,25 @@ struct VmdResult {
 	 float dt, float dx, float x0,  // <--- 增加 x0 参数
 	 float f_min, float f_max, int nf,
 	 float v_min, float v_max, int nv);
+
+ // 在 FK变换
+ std::vector<std::vector<float>> computeFKDispersion(
+	 const std::vector<std::vector<float>>& seismicData,
+	 float dt, float dx,
+	 float f_min, float f_max, int nf,
+	 float v_min, float v_max, int nv);
+
+ // Capon 最小方差法 (MVDR) / HRFK 
+ std::vector<std::vector<float>> computeCaponMVDRDispersion(
+	 const std::vector<std::vector<float>>& seismicData,
+	 float dt, float dx,
+	 float f_min, float f_max, int nf,
+	 float v_min, float v_max, int nv);
+
+ //  Slant-Stack τ−p变换法
+
+ std::vector<std::vector<float>> computeSlantStackDispersion(
+	 const std::vector<std::vector<float>>& seismicData,
+	 float dt, float dx, float x0,
+	 float f_min, float f_max, int nf,
+	 float v_min, float v_max, int nv);

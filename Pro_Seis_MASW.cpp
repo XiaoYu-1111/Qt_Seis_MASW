@@ -483,8 +483,14 @@ void Pro_Seis_MASW::initControlDock()
     QFormLayout* scanLayout = new QFormLayout(scanGroup);
     scanLayout->setSpacing(6);
 
-    comboMethod = new QComboBox(scanGroup);
-    comboMethod->addItems({ QStringLiteral("移相法 (Phase Shift)"), QStringLiteral("F-K 变换法") });
+    comboMethod = new QComboBox(scanGroup);//MVDR
+    // 修改 comboMethod 的选项列表：
+    comboMethod->addItems({
+        QStringLiteral("移相法 (Phase Shift)"),
+        QStringLiteral("F-K 变换法"),
+        QStringLiteral("Capon (高分辨率 MVDR)"),
+        QStringLiteral("倾斜叠加法 (Slant-Stack / τ-p)") // <--- 新增第 4 种方法
+        });
 
     comboGridQuality = new QComboBox(scanGroup);
     comboGridQuality->addItem(QStringLiteral("快速预览 (100 × 100 - 极速)"), QPoint(100, 100));
@@ -798,10 +804,34 @@ void Pro_Seis_MASW::onCalculateClicked()
 
     QApplication::setOverrideCursor(Qt::WaitCursor);
 
-    // 2. 计算并将原始能量缓存到 m_rawDispersionEnergy
-    m_rawDispersionEnergy = computePhaseShiftDispersion(
-        m_seismicData, dt, dx, x0, m_dispFmin, m_dispFmax, m_dispNf, m_dispVmin, m_dispVmax, m_dispNv);
 
+    int methodIndex = comboMethod->currentIndex(); // 0: 移相法, 1: F-K 变换法 2:MVDR
+
+
+    if (methodIndex == 0) {
+        textLog->append(QStringLiteral("[%1] 采用【移相法 (Phase Shift)】计算频散谱...")
+            .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+        m_rawDispersionEnergy = computePhaseShiftDispersion(
+            m_seismicData, dt, dx, x0, m_dispFmin, m_dispFmax, m_dispNf, m_dispVmin, m_dispVmax, m_dispNv);
+    }
+    else if (methodIndex == 1) {
+        textLog->append(QStringLiteral("[%1] 采用【F-K 变换法】计算频散谱...")
+            .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+        m_rawDispersionEnergy = computeFKDispersion(
+            m_seismicData, dt, dx, m_dispFmin, m_dispFmax, m_dispNf, m_dispVmin, m_dispVmax, m_dispNv);
+    }
+    else if (methodIndex == 2) {
+        textLog->append(QStringLiteral("[%1] 采用【Capon 高分辨率 (MVDR)】计算频散谱...")
+            .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+        m_rawDispersionEnergy = computeCaponMVDRDispersion(
+            m_seismicData, dt, dx, m_dispFmin, m_dispFmax, m_dispNf, m_dispVmin, m_dispVmax, m_dispNv);
+    }
+    else {
+        textLog->append(QStringLiteral("[%1] 采用【倾斜叠加法 (Slant-Stack / τ-p)】计算频散谱...")
+            .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+        m_rawDispersionEnergy = computeSlantStackDispersion(
+            m_seismicData, dt, dx, x0, m_dispFmin, m_dispFmax, m_dispNf, m_dispVmin, m_dispVmax, m_dispNv);
+    }
     QApplication::restoreOverrideCursor();
 
     if (m_rawDispersionEnergy.empty()) {
