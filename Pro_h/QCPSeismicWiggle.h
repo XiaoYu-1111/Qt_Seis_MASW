@@ -1,46 +1,48 @@
 ﻿#pragma once
+
 #include "qcustomplot.h"
 #include <vector>
 #include <memory>
-#include <cmath>
-#include <algorithm>
 
 class QCPSeismicWiggle : public QCPAbstractPlottable {
     Q_OBJECT
 
 public:
-    // 定义显示模式
     enum DisplayMode {
-        dmWiggleOnly,       // 仅波形线 (Wiggle)
-        dmVariableArea,     // 仅变密度填充 (Variable Area - VA)
-        dmWiggleAndVA       // 波形线 + 填充 (标准地震显示)
+        dmWiggleOnly,       // 仅波形起伏线 (Wiggle Only)
+        dmVariableArea,     // 仅正半周变面积填充 (Variable Area - VA)
+        dmWiggleAndVA       // 标准地震显示: 波形线 + 正半周填充
     };
 
     explicit QCPSeismicWiggle(QCPAxis* keyAxis, QCPAxis* valueAxis);
-    virtual ~QCPSeismicWiggle() = default;
+    ~QCPSeismicWiggle() override = default;
 
+    // 数据设置 (传入 shared_ptr 保证大数据零拷贝)
     void setData(std::shared_ptr<std::vector<std::vector<float>>> data, float dt);
 
-    // 设置/获取属性
+    // 属性配置
     void setGain(float gain);
-    float getGain() const; // 【补全缺失的声明】
+    float getGain() const { return m_gain; }
+
     void setDisplayMode(DisplayMode mode);
-    void setFillColor(QColor color); // 设置正半周填充颜色
+    DisplayMode displayMode() const { return m_mode; }
 
-    // 必须实现的虚函数
-    virtual double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
-    virtual QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
-    virtual QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth, const QCPRange& inKeyRange = QCPRange()) const override;
+    void setFillColor(const QColor& color);
+    QColor fillColor() const { return m_fillColor; }
 
-    // --- 必须实现这个虚函数 ---
-    virtual void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+    // QCustomPlot 虚函数规范实现
+    double selectTest(const QPointF& pos, bool onlySelectable, QVariant* details = nullptr) const override;
+    QCPRange getKeyRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth) const override;
+    QCPRange getValueRange(bool& foundRange, QCP::SignDomain inSignDomain = QCP::sdBoth, const QCPRange& inKeyRange = QCPRange()) const override;
+    void drawLegendIcon(QCPPainter* painter, const QRectF& rect) const override;
+
 protected:
-    virtual void draw(QCPPainter* painter) override;
+    void draw(QCPPainter* painter) override;
 
 private:
     std::shared_ptr<std::vector<std::vector<float>>> m_data;
     float m_dt = 1.0f;
     float m_gain = 1.0f;
-    DisplayMode m_mode = dmWiggleAndVA; // 默认：波形+填充
-    QColor m_fillColor = Qt::black;     // 默认填充黑色
+    DisplayMode m_mode = dmWiggleAndVA;
+    QColor m_fillColor = Qt::black;
 };

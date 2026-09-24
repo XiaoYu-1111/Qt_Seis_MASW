@@ -70,6 +70,9 @@
     <ClCompile Include="Pro_cpp\RayleighForwardSolver.cpp">
       <Filter>Pro_cpp</Filter>
     </ClCompile>
+    <ClCompile Include="Pro_cpp\RayleighInversionSolver.cpp">
+      <Filter>Pro_cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="qcustomplot.h">
@@ -96,6 +99,9 @@
       <Filter>Pro_h</Filter>
     </ClInclude>
     <ClInclude Include="Pro_h\RayleighForwardSolver.h">
+      <Filter>Pro_h</Filter>
+    </ClInclude>
+    <ClInclude Include="Pro_h\RayleighInversionSolver.h">
       <Filter>Pro_h</Filter>
     </ClInclude>
   </ItemGroup>

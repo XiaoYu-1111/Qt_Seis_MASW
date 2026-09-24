@@ -1,17 +1,7 @@
 ﻿#pragma once
+
 #include "qcustomplot.h"
-#include <QtWidgets/QMainWindow>
-#include <QTimer>
-#include <QFileDialog> // 别忘了头文件
-#include <QInputDialog>
-#include <QScrollArea>
-
-#include <complex>
-#include <omp.h>           // 并行计算
-#include <Eigen/Dense>
-#include <unsupported/Eigen/FFT>
-
-
+#include <vector>
 
 namespace Data_show
 {
@@ -21,32 +11,55 @@ namespace Data_show
 
     public:
         explicit Plot1D(QWidget* parent = nullptr);
+        ~Plot1D() override = default;
 
-        void setData(const std::vector<float>& vec, const QString& title);
+        // --- 数据设置接口 ---
+        void setData(const std::vector<float>& vec, const QString& title = QString());
+        void setData(const std::vector<double>& x, const std::vector<double>& y, const QString& title = QString());
+        void setData(const QVector<double>& x, const QVector<double>& y, const QString& title = QString());
 
-        // [新增]：支持传入 X(频率) 和 Y(幅度)
-        void setData(const std::vector<double>& x, const std::vector<double>& y, const QString& title);
-
-        // Plot1D.h
-    public:
-        // 专门用于实时更新，不改样式，不改标题，只改数据
+        // 快速更新数据（用于实时刷新，不重建图元、不重新计算坐标轴边距）
         void updateDataOnly(const std::vector<double>& x, const std::vector<double>& y);
-        void m_setName(const QString& name);
+        void updateDataOnly(const QVector<double>& x, const QVector<double>& y);
 
-        void setSampleRate(double fs); // 设置采样频率
+        // 标题与采样率接口
+        void setTitle(const QString& title);
+        void m_setName(const QString& name); // 保留兼容原代码调用
+
+        void setSampleRate(double fs);
         double sampleRate() const;
 
+        // 重写清空，杜绝野指针
+        void clearGraphs();
+
     protected:
-        // 事件系统
         void mousePressEvent(QMouseEvent* event) override;
         void wheelEvent(QWheelEvent* event) override;
         void contextMenuEvent(QContextMenuEvent* event) override;
 
     private:
-        QCPGraph* m_mainGraph;
-        QCPTextElement* m_titleElement = nullptr; // 用于存储标题对象
-        double m_sampleRate = 1000.0; // 默认 1000 Hz
+        // 核心图层防护与样式
+        QCPGraph* ensureMainGraph();
+        void applyScientificStyle();
+        void setupGraphStyle(QCPGraph* graph, const QString& title, int pointCount);
+
+        // 提取交互选区数据辅助函数
+        bool extractSelectedData(std::vector<double>& outT, std::vector<double>& outSig, double& outDt);
+
+        // 右键分析功能子模块（解耦 contextMenuEvent）
+        void handleSTransform(const std::vector<double>& t, const std::vector<double>& sig);
+        void handleSTFT(const std::vector<double>& t, const std::vector<double>& sig);
+        void handleCWT(const std::vector<double>& t, const std::vector<double>& sig);
+        void handleVMD(const std::vector<double>& t, const std::vector<double>& sig);
+        void handleWelchPSD(const std::vector<double>& sig);
+        void handleHilbertEnvelope(const std::vector<double>& t, const std::vector<double>& sig);
+        void handleFFTSpectrum(const std::vector<double>& sig);
+        void handleExportData();
+        void handleSetSampleRate();
+
     private:
-        void applyScientificStyle(); // 应用期刊风格样式
+        QCPGraph* m_mainGraph = nullptr;          // 主曲线指针
+        QCPTextElement* m_titleElement = nullptr; // 标题元素
+        double m_sampleRate = 1000.0;             // 采样率 (Hz)
     };
 }

@@ -14,7 +14,29 @@
 #include <QDropEvent>
 #include <QMimeData>
 
+#include <QVBoxLayout>
+#include <QFormLayout>
+#include <QGroupBox>
+#include <QDockWidget>
+#include <QTabWidget>
+#include <QTextEdit>
+#include <QDoubleSpinBox>
+#include <QComboBox>
+#include <QPushButton>
+#include <QDateTime>
+#include <QFileDialog>
+#include <QToolBar>
+#include <QAction>
+#include <QMessageBox>
+
+// 引入模块
+#include "Pro_h/SeismicIO.h"
 #include "Pro_h/Plot1D.h"
+#include "Pro_h/SeismicView2D.h"
+#include "Pro_h/SignalProcessingUtils.h"
+#include "Pro_h/RayleighForwardSolver.h"
+
+#include "Pro_h/RayleighInversionSolver.h"
 
 #include <QThread>
 #include <fstream>
@@ -93,6 +115,7 @@ private slots:
     void onAiPickClicked(); // AI 一键自动拾取槽函数
 
     void onLoadInversionModel(); // 载入反演模型文件槽函数
+    void onRunInversionClicked(); // 【原生 C++ 1D 速度反演】槽函数
 
     void onResetAll();        // 一键重置全部视图
     void onShowHelp();        // 显示系统帮助与说明
@@ -193,6 +216,8 @@ private:
     QTableWidget* tableVsModel = nullptr; // 地层参数表格
     QPushButton* btnLoadVsModel = nullptr; // 载入模型文件按钮
     QLabel* lblVsSummary = nullptr; // 底部模型状态摘要
+
+    QPushButton* btnRunInversion = nullptr; // 开始 1D 速度反演按钮
 
     // =====================================================
     // 7. 顶部工具栏数据看板胶囊标签 (Data Badges)

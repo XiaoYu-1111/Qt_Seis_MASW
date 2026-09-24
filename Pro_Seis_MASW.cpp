@@ -3,26 +3,7 @@
 #include "qcustomplot.h"
 #include "style.h"
 
-// 引入模块
-#include "Pro_h/SeismicIO.h"
-#include "Pro_h/SeismicView2D.h"
-#include "Pro_h/SignalProcessingUtils.h"
-#include "Pro_h/RayleighForwardSolver.h"
 
-#include <QVBoxLayout>
-#include <QFormLayout>
-#include <QGroupBox>
-#include <QDockWidget>
-#include <QTabWidget>
-#include <QTextEdit>
-#include <QDoubleSpinBox>
-#include <QComboBox>
-#include <QPushButton>
-#include <QDateTime>
-#include <QFileDialog>
-#include <QToolBar>
-#include <QAction>
-#include <QMessageBox>
 
 // 辅助函数：根据名称生成 QCustomPlot 色标渐变
 static QCPColorGradient getScientificGradient(const QString& type, bool invert = false)
@@ -618,6 +599,17 @@ void Pro_Seis_MASW::initMainTabs()
     invBarLayout->setContentsMargins(15, 0, 15, 0);
     invBarLayout->setSpacing(12);
 
+    btnRunInversion = new QPushButton(QStringLiteral("🚀 开始 1D 速度反演"), invBottomBar);
+    btnRunInversion->setStyleSheet(
+        "QPushButton {"
+        "   background-color: #059669; color: white; font-weight: bold;"
+        "   padding: 5px 16px; border-radius: 4px; min-height: 26px;"
+        "}"
+        "QPushButton:hover { background-color: #047857; }"
+        "QPushButton:pressed { background-color: #065f46; }"
+    );
+    connect(btnRunInversion, &QPushButton::clicked, this, &Pro_Seis_MASW::onRunInversionClicked);
+
     lblVsSummary = new QLabel(QStringLiteral("暂未载入反演地层模型"), invBottomBar);
     lblVsSummary->setStyleSheet("color: #38bdf8; font-family: Consolas; font-size: 12px;");
 
@@ -630,6 +622,7 @@ void Pro_Seis_MASW::initMainTabs()
 
     invBarLayout->addWidget(lblVsSummary);
     invBarLayout->addStretch();
+    invBarLayout->addWidget(btnRunInversion); // <--- 新增原生反演按钮
     invBarLayout->addWidget(btnLoadVsModel);
 
     invMainLayout->addWidget(invBottomBar, 0);
@@ -762,73 +755,87 @@ void Pro_Seis_MASW::initControlDock()
     dispLayout->addStretch(); // 将控件往顶部压缩，防止变形
 
     // =========================================================================
-    // 【页面 2】理论正演模拟 (Tab 2: Theoretical Synthesis)
-    // =========================================================================
+        // 【页面 2】理论正演模拟 (Tab 2: Theoretical Synthesis)
+        // =========================================================================
     QWidget* pageSynthetic = new QWidget(dockTabs);
     QVBoxLayout* synthLayout = new QVBoxLayout(pageSynthetic);
     synthLayout->setContentsMargins(8, 8, 8, 8);
     synthLayout->setSpacing(8);
 
-    // --- 理论地质模型参数 (1D Model) ---
-   // 找到 initControlDock() 中的【页面 2】理论正演模拟部分，替换 modelGroup：
+    // --- 1. 经典地学模型快速预设 ---
+    QGroupBox* presetGroup = new QGroupBox(QStringLiteral("地学场景快速预设"), pageSynthetic);
+    QVBoxLayout* presetLayout = new QVBoxLayout(presetGroup);
+    presetLayout->setContentsMargins(6, 6, 6, 6);
 
-    QGroupBox* modelGroup = new QGroupBox(QStringLiteral("三层地质模型参数 (3-Layer Model)"), pageSynthetic);
+    QComboBox* comboModelPreset = new QComboBox(presetGroup);
+    // 【新增两层模型选项】
+    comboModelPreset->addItem(QStringLiteral("经典两层模型 (单层覆盖层在基底上)")); // 索引 0: 经典双层
+    comboModelPreset->addItem(QStringLiteral("标准三层递增型 (覆盖-风化-基岩)"));     // 索引 1: 经典三层
+    comboModelPreset->addItem(QStringLiteral("低速夹层型 (软弱夹层/速度倒转)"));     // 索引 2: 速度倒转
+    comboModelPreset->addItem(QStringLiteral("浅层坚硬基岩型 (极薄覆盖强波阻抗)")); // 索引 3: 浅基岩
+    presetLayout->addWidget(comboModelPreset);
+    synthLayout->addWidget(presetGroup);
+
+    // --- 2. 地质模型参数控件 ---
+    QGroupBox* modelGroup = new QGroupBox(QStringLiteral("地质分层模型参数 (1D Model)"), pageSynthetic);
     QFormLayout* modelLayout = new QFormLayout(modelGroup);
-    modelLayout->setSpacing(6);
+    modelLayout->setSpacing(5);
 
-    // --- 第 1 层 ---
+    // 第 1 层
     spinLayerH1 = new QDoubleSpinBox(modelGroup);
-    spinLayerH1->setRange(0.5, 100.0);
-    spinLayerH1->setValue(20.0); // 浅表层厚度 5m
+    spinLayerH1->setRange(0.5, 50.0);
+    spinLayerH1->setValue(10.0); // 默认双层覆盖厚度 10 米
     spinLayerH1->setSuffix(" m");
 
     spinLayerVs1 = new QDoubleSpinBox(modelGroup);
-    spinLayerVs1->setRange(50.0, 2000.0);
-    spinLayerVs1->setValue(300.0); // 表层横波 300 m/s
+    spinLayerVs1->setRange(50.0, 1500.0);
+    spinLayerVs1->setValue(300.0); // 默认表层横波 300 m/s
     spinLayerVs1->setSuffix(" m/s");
 
-    // --- 第 2 层 ---
+    // 第 2 层
     spinLayerH2 = new QDoubleSpinBox(modelGroup);
-    spinLayerH2->setRange(0.5, 200.0);
-    spinLayerH2->setValue(100.0); // 中间层厚度 100m
+    spinLayerH2->setRange(0.5, 80.0);
+    spinLayerH2->setValue(10.0);
     spinLayerH2->setSuffix(" m");
 
     spinLayerVs2 = new QDoubleSpinBox(modelGroup);
-    spinLayerVs2->setRange(50.0, 3000.0);
-    spinLayerVs2->setValue(600.0); // 中间层横波 600 m/s
+    spinLayerVs2->setRange(50.0, 2500.0);
+    spinLayerVs2->setValue(400.0);
     spinLayerVs2->setSuffix(" m/s");
 
-    // --- 第 3 层 (基底) ---
+    // 第 3 层 (基底半空间)
     spinLayerVs3 = new QDoubleSpinBox(modelGroup);
     spinLayerVs3->setRange(100.0, 5000.0);
-    spinLayerVs3->setValue(600.0); // 基底基岩横波 600 m/s
+    spinLayerVs3->setValue(600.0); // 默认基底横波 600 m/s
     spinLayerVs3->setSuffix(" m/s");
 
-    // --- 子波主频 ---
+    // 子波主频
     spinWaveletFm = new QDoubleSpinBox(modelGroup);
-    spinWaveletFm->setRange(1.0, 200.0);
-    spinWaveletFm->setValue(12.0); // 主频 12 Hz
+    spinWaveletFm->setRange(2.0, 100.0);
+    spinWaveletFm->setValue(12.0); // 默认 12 Hz
     spinWaveletFm->setSuffix(" Hz");
 
     modelLayout->addRow(QStringLiteral("第 1 层厚度 (H1):"), spinLayerH1);
     modelLayout->addRow(QStringLiteral("第 1 层横波 (Vs1):"), spinLayerVs1);
     modelLayout->addRow(QStringLiteral("第 2 层厚度 (H2):"), spinLayerH2);
     modelLayout->addRow(QStringLiteral("第 2 层横波 (Vs2):"), spinLayerVs2);
-    modelLayout->addRow(QStringLiteral("第 3 层基底 (Vs3):"), spinLayerVs3);
+    modelLayout->addRow(QStringLiteral("基底横波 (Vs):"), spinLayerVs3);
     modelLayout->addRow(QStringLiteral("雷克子波主频:"), spinWaveletFm);
     synthLayout->addWidget(modelGroup);
 
-    // --- 一键合成理论面波记录按钮 ---
+    // --- 3. 操作按钮区 ---
+    QPushButton* btnQuickCurve = new QPushButton(QStringLiteral("📈 仅预览理论频散线 (0毫秒)"), pageSynthetic);
+    btnQuickCurve->setStyleSheet(
+        "QPushButton { background-color: #1e293b; color: #38bdf8; border: 1px solid #334155; padding: 4px; border-radius: 4px; }"
+        "QPushButton:hover { background-color: #334155; border-color: #38bdf8; }"
+    );
+    synthLayout->addWidget(btnQuickCurve);
+
     QPushButton* btnSynthetic = new QPushButton(QStringLiteral("🧪 一键合成理论面波记录"), pageSynthetic);
     btnSynthetic->setStyleSheet(
         "QPushButton {"
-        "   background-color: #059669;"
-        "   border: 1px solid #047857;"
-        "   color: white;"
-        "   font-weight: bold;"
-        "   border-radius: 4px;"
-        "   padding: 6px 12px;"
-        "   min-height: 28px;"
+        "   background-color: #059669; border: 1px solid #047857; color: white;"
+        "   font-weight: bold; border-radius: 4px; padding: 6px 12px; min-height: 32px;"
         "}"
         "QPushButton:hover { background-color: #047857; }"
         "QPushButton:pressed { background-color: #065f46; }"
@@ -836,7 +843,88 @@ void Pro_Seis_MASW::initControlDock()
     connect(btnSynthetic, &QPushButton::clicked, this, &Pro_Seis_MASW::onSyntheticClicked);
     synthLayout->addWidget(btnSynthetic);
 
-    synthLayout->addStretch(); // 弹性占位
+    synthLayout->addStretch();
+
+    // =========================================================
+    // 4. 预设联动：自动控制两层/三层控件的可用性
+    // =========================================================
+    auto updatePreset = [=](int idx) {
+        if (idx == 0) {
+            // 【两层经典模型】：第2层自动置灰禁用，第3层直接作为基底
+            spinLayerH2->setEnabled(false);
+            spinLayerVs2->setEnabled(false);
+            spinLayerH1->setValue(10.0);   spinLayerVs1->setValue(300.0);
+            spinLayerVs3->setValue(600.0); // 基底 Vs = 600 m/s
+            spinWaveletFm->setValue(12.0);
+        }
+        else {
+            // 三层模型：全部控件恢复可用
+            spinLayerH2->setEnabled(true);
+            spinLayerVs2->setEnabled(true);
+
+            if (idx == 1) {
+                // 标准三层递增型 (土 -> 砾石 -> 基岩)
+                spinLayerH1->setValue(5.0);   spinLayerVs1->setValue(200.0);
+                spinLayerH2->setValue(8.0);   spinLayerVs2->setValue(380.0);
+                spinLayerVs3->setValue(750.0);
+                spinWaveletFm->setValue(15.0);
+            }
+            else if (idx == 2) {
+                // 低速夹层型 (硬壳层 -> 软弱层 -> 基底)
+                spinLayerH1->setValue(4.0);   spinLayerVs1->setValue(350.0);
+                spinLayerH2->setValue(6.0);   spinLayerVs2->setValue(160.0);
+                spinLayerVs3->setValue(600.0);
+                spinWaveletFm->setValue(12.0);
+            }
+            else if (idx == 3) {
+                // 浅基岩型 (薄层覆盖 -> 坚硬基岩)
+                spinLayerH1->setValue(3.0);   spinLayerVs1->setValue(160.0);
+                spinLayerH2->setValue(5.0);   spinLayerVs2->setValue(450.0);
+                spinLayerVs3->setValue(1200.0);
+                spinWaveletFm->setValue(18.0);
+            }
+        }
+        };
+
+    connect(comboModelPreset, QOverload<int>::of(&QComboBox::currentIndexChanged), this, updatePreset);
+
+    // 默认激活两层模型状态
+    updatePreset(0);
+
+    // 快速预览按钮联动
+    connect(btnQuickCurve, &QPushButton::clicked, this, [=]() {
+        double h1 = spinLayerH1->value(), vs1 = spinLayerVs1->value();
+        double h2 = spinLayerH2->value(), vs2 = spinLayerVs2->value();
+        double vs3 = spinLayerVs3->value();
+
+        LayerModel model;
+        // 如果第 2 层被禁用，底层自动按纯两层介质计算
+        if (!spinLayerH2->isEnabled()) {
+            model.H = { h1 };
+            model.VS = { vs1, vs3 };
+            model.VP = { vs1 * 2.0, vs3 * 2.0 };
+            model.Rho = { 2000.0, 2000.0 };
+        }
+        else {
+            model.H = { h1, h2 };
+            model.VS = { vs1, vs2, vs3 };
+            model.VP = { vs1 * 2.0, vs2 * 2.0, vs3 * 2.0 };
+            model.Rho = { 1800.0, 2000.0, 2200.0 };
+        }
+
+        std::vector<double> freqs;
+        for (double f = spinFmin->value(); f <= spinFreqMax->value(); f += 0.5) {
+            freqs.push_back(f);
+        }
+
+        auto theoVel = RayleighForwardSolver::calcBaseDispersion(freqs, model);
+
+        if (plotCurve1D) {
+            plotCurve1D->setData(freqs, theoVel, QStringLiteral("理论频散曲线 (预览)"));
+            plotCurve1D->graph(0)->setPen(QPen(Qt::red, 2.0));
+            mainTabWidget->setCurrentWidget(plotCurve1D);
+        }
+        });
 
     // =========================================================================
     // 【页面 3】AI 训练集批量生成 (Tab 3: Dataset Generation)
@@ -1463,7 +1551,7 @@ void Pro_Seis_MASW::exportDispersionToSegy()
 
 void Pro_Seis_MASW::onSyntheticClicked()
 {
-    // 1. 动态从面板读取三层地质模型参数
+    // 1. 动态读取输入值
     double h1 = spinLayerH1->value();
     double vs1 = spinLayerVs1->value();
     double h2 = spinLayerH2->value();
@@ -1471,45 +1559,55 @@ void Pro_Seis_MASW::onSyntheticClicked()
     double vs3 = spinLayerVs3->value();
     double fm = spinWaveletFm->value();
 
-    // 2. 组装三层介质物理模型
+    // =========================================================
+    // 【核心自适应】：根据第 2 层是否启用来构建物理地层模型
+    // =========================================================
     LayerModel model;
-    model.H = { h1, h2 };                     // 2 个层厚参数 (最后一层为无限半空间)
-    model.VS = { vs1, vs2, vs3 };              // 3 层横波速度
-    model.VP = { vs1 * 2.0, vs2 * 2.0, vs3 * 2.0 }; // 标称泊松介质 Vp = 2*Vs
-    model.Rho = { 1800.0, 2000.0, 2200.0 };     // 各层密度 (递增)
+    QString modelTypeStr;
 
-    // 3. 读取几何与频率范围
+    if (!spinLayerH2->isEnabled()) {
+        // --- 纯两层模型 (单层覆盖基底) ---
+        model.H = { h1 };
+        model.VS = { vs1, vs3 };
+        model.VP = { vs1 * 2.0, vs3 * 2.0 };
+        model.Rho = { 2000.0, 2000.0 };
+        modelTypeStr = QString("两层模型: H1=%1m, Vs1=%2m/s, 基底Vs=%3m/s").arg(h1).arg(vs1).arg(vs3);
+    }
+    else {
+        // --- 三层模型 ---
+        model.H = { h1, h2 };
+        model.VS = { vs1, vs2, vs3 };
+        model.VP = { vs1 * 2.0, vs2 * 2.0, vs3 * 2.0 };
+        model.Rho = { 1800.0, 2000.0, 2200.0 };
+        modelTypeStr = QString("三层模型: H=[%1,%2]m, Vs=[%3,%4,%5]m/s").arg(h1).arg(h2).arg(vs1).arg(vs2).arg(vs3);
+    }
+
+    // 2. 读取几何与频率范围
     double dt = spinDt->value() / 1000.0;
     double dx = spinDx->value();
     double x0 = spinOffset0->value();
     double fmin = spinFmin->value();
     double fmax = spinFreqMax->value();
 
-    // 采样频率序列 (步长 0.25 Hz，更密集的频点可以让三层频散拐折更平滑)
     std::vector<double> freqs;
     for (double f = fmin; f <= fmax; f += 0.25) freqs.push_back(f);
 
-    textLog->append(QStringLiteral("[%1] 正在进行三层介质面波理论正演求解...")
-        .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+    textLog->append(QStringLiteral("[%1] 正在进行理论面波正演计算 (%2)...")
+        .arg(QDateTime::currentDateTime().toString("hh:mm:ss")).arg(modelTypeStr));
 
-    // 4. 计算理论相速度曲线 (自动处理三层模型)
+    // 3. 求解理论频散曲线 (自动处理 2 层或 3 层)
     auto theoVel = RayleighForwardSolver::calcBaseDispersion(freqs, model);
 
-    // 5. 合成 96 道面波记录 (物理相移调制 + IFFT)
+    // 4. 合成 96 道面波记录
     int nTraces = 96;
     std::vector<double> offsets;
     for (int i = 0; i < nTraces; ++i) offsets.push_back(x0 + i * dx);
 
     m_seismicData = RayleighForwardSolver::synthesizeSurfaceWaveGather(
-        freqs, theoVel, dt, 1000 /*nt=1000点*/, offsets, fm);
+        freqs, theoVel, dt, 1000, offsets, fm);
 
-    // 6. 载入道集视图 (Tab 1)
-    QWidget* plotWidget = createSeismicView(
-        m_seismicData,
-        QStringLiteral("三层介质理论面波剖面"),
-        seismicViewContainer,
-        static_cast<float>(dt) // <--- 传入当前正演设定的真实 dt
-    );
+    // 5. 载入道集界面展示 (Tab 1)
+    QWidget* plotWidget = createSeismicView(m_seismicData, QStringLiteral("理论合成面波剖面"), seismicViewContainer, static_cast<float>(dt));
     QLayout* layout = seismicViewContainer->layout();
     QLayoutItem* item;
     while ((item = layout->takeAt(0)) != nullptr) {
@@ -1519,21 +1617,14 @@ void Pro_Seis_MASW::onSyntheticClicked()
     layout->addWidget(plotWidget);
     mainTabWidget->setCurrentIndex(0);
 
-    // 7. 将理论曲线更新至 Tab 3 (Plot1D)
+    // 6. 将理论曲线更新至 Tab 3 (Plot1D)
     if (plotCurve1D) {
-        plotCurve1D->setData(freqs, theoVel, QStringLiteral("三层介质理论基阶频散曲线 (3-Layer Theoretical)"));
+        plotCurve1D->setData(freqs, theoVel, QStringLiteral("理论基阶频散曲线 (Theoretical)"));
         plotCurve1D->graph(0)->setPen(QPen(Qt::red, 2.0));
     }
 
-    textLog->append(QStringLiteral("[%1] 三层介质面波正演完成: H=[%2, %3]m, Vs=[%4, %5, %6]m/s, 主频=%7Hz")
-        .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
-        .arg(h1).arg(h2)
-        .arg(vs1).arg(vs2).arg(vs3)
-        .arg(fm));
-
-    // 理论数据点亮看板
-    updateDataBadges(QStringLiteral("三层介质理论正演模型"), nTraces, 1000, dt * 1000.0f);
-    statusChipData->setText(QStringLiteral("<font color='#10b981'>●</font> <b>数据</b>: 96道×1000点 (正演)"));
+    textLog->append(QStringLiteral("[%1] 理论面波合成完成，成果已载入 Tab 1 和 Tab 3。")
+        .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
 }
 
 void Pro_Seis_MASW::onStartDatasetGeneration()
@@ -1832,13 +1923,114 @@ void Pro_Seis_MASW::onLoadInversionModel()
     displayInversionModel(fileName);
 }
 
+void Pro_Seis_MASW::onRunInversionClicked()
+{
+    // 1. 检查是否有拾取的频散曲线
+    if (m_pickedPoints.size() < 4) {
+        QMessageBox::warning(this, QStringLiteral("提示"),
+            QStringLiteral("当前拾取的频散曲线点数不足（至少需要 4 个频点）！\n\n请在 Tab 2 进行【AI 一键拾取】或手动点选拾取。"));
+        return;
+    }
+
+    // 2. 准备反演输入观测数据
+    std::vector<double> freqs;
+    std::vector<double> obsVel;
+    freqs.reserve(m_pickedPoints.size());
+    obsVel.reserve(m_pickedPoints.size());
+
+    for (const auto& pt : m_pickedPoints) {
+        freqs.push_back(pt.x());
+        obsVel.push_back(pt.y());
+    }
+
+    textLog->append(QStringLiteral("[%1] 🚀 启动纯 C++ 原生 1D 横波速度反演 (Levenberg-Marquardt)...")
+        .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+
+    QApplication::setOverrideCursor(Qt::WaitCursor);
+    QElapsedTimer timer;
+    timer.start(); 
+
+    // 3. 配置反演参数 (与 Python 端保持一致)
+    InversionParams params;
+    params.layerH = { 2.0, 3.0, 5.0, 8.0, 12.0 }; // 6层模型 (前5层厚度，第6层为半空间)
+    params.vsMin = 100.0;
+    params.vsMax = 1500.0;
+    params.lambdaReg = 0.02; // Tikhonov 平滑正则化系数
+    params.maxIter = 25;
+
+    // 4. 执行纯 C++ 原生非线性反演
+    InversionResult res = RayleighInversionSolver::runInversion(freqs, obsVel, params);
+    qint64 elapsedMs = timer.elapsed();
+    QApplication::restoreOverrideCursor();
+
+    if (!res.success) {
+        QMessageBox::critical(this, QStringLiteral("反演失败"), QStringLiteral("反演迭代未能收敛，请检查频散曲线数据！"));
+        return;
+    }
+
+    // 5. 自动导出保存 Inverted_Vs_Model.txt (保证成果有存档)
+    QString outPath = QCoreApplication::applicationDirPath() + "/models/Inverted_Vs_Model.txt";
+    QDir dir(QFileInfo(outPath).absolutePath());
+    if (!dir.exists()) dir.mkpath(".");
+
+    QFile file(outPath);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream out(&file);
+        out << "# Layer\tThickness(m)\tDepth_Top(m)\tVs(m/s)\tVp(m/s)\tDensity(kg/m3)\n";
+        double topZ = 0.0;
+        int nLayers = res.vs.size();
+        for (int i = 0; i < nLayers; ++i) {
+            double thk = (i < params.layerH.size()) ? params.layerH[i] : 0.0;
+            out << (i + 1) << "\t"
+                << QString::number(thk, 'f', 2) << "\t"
+                << QString::number(topZ, 'f', 2) << "\t"
+                << QString::number(res.vs[i], 'f', 2) << "\t"
+                << QString::number(res.vs[i] * 2.0, 'f', 2) << "\t2000.0\n";
+            topZ += thk;
+        }
+        file.close();
+    }
+
+    // 6. 直接调用 displayInversionModel 绘制 Tab 4 的阶梯剖面与表格
+    displayInversionModel(outPath);
+
+    // 7. 同步将反演拟合的理论黑线回传至 Tab 3，实现拟合度可视化质检
+    if (plotCurve1D) {
+        // 在 Tab 3 上增加或更新反演拟合曲线
+        if (plotCurve1D->graphCount() < 2) {
+            plotCurve1D->addGraph();
+        }
+        QVector<double> qf(res.freqs.begin(), res.freqs.end());
+        QVector<double> qv(res.calcVel.begin(), res.calcVel.end());
+        plotCurve1D->graph(1)->setData(qf, qv);
+        plotCurve1D->graph(1)->setPen(QPen(Qt::black, 2.0, Qt::DashLine));
+        plotCurve1D->graph(1)->setName(QStringLiteral("反演拟合曲线 (RMSE=%1 m/s)").arg(res.rmse, 0, 'f', 2));
+        plotCurve1D->replot();
+    }
+
+    // 8. 界面与日志提示
+    textLog->append(QStringLiteral("[%1] 🎉 C++ 原生反演成功收敛！迭代次数: %2 轮, 耗时: %3 ms, 拟合误差 RMSE: %4 m/s。")
+        .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
+        .arg(res.iterations)
+        .arg(elapsedMs)
+        .arg(res.rmse, 0, 'f', 2));
+
+    QMessageBox::information(this, QStringLiteral("反演成功"),
+        QStringLiteral("纯 C++ 1D 速度结构反演已成功收敛！\n\n"
+            "• 迭代次数: %1 次\n"
+            "• 运算耗时: %2 ms (毫秒级原生计算)\n"
+            "• 拟合误差 RMSE: %3 m/s\n"
+            "• 成果已同步至 Tab 3 (拟合度) 与 Tab 4 (阶梯图/表格)")
+        .arg(res.iterations).arg(elapsedMs).arg(res.rmse, 0, 'f', 2));
+
+    // 自动切到 Tab 4 查看成果
+    mainTabWidget->setCurrentWidget(inversionContainer);
+}
+
 void Pro_Seis_MASW::displayInversionModel(const QString& filePath)
 {
     QFile file(filePath);
-    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
-        QMessageBox::warning(this, QStringLiteral("错误"), QStringLiteral("无法读取模型文件：\n") + file.errorString());
-        return;
-    }
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) return;
 
     struct LayerInfo {
         int layer;
@@ -1855,7 +2047,7 @@ void Pro_Seis_MASW::displayInversionModel(const QString& filePath)
         QString line = in.readLine().trimmed();
         if (line.isEmpty() || line.startsWith("#")) continue;
 
-        QStringList tokens = line.split(QRegularExpression(QStringLiteral("\\s+")), Qt::SkipEmptyParts);
+        QStringList tokens = line.simplified().split(QLatin1Char(' '));
         if (tokens.size() >= 5) {
             LayerInfo info;
             info.layer = tokens[0].toInt();
@@ -1868,87 +2060,73 @@ void Pro_Seis_MASW::displayInversionModel(const QString& filePath)
     }
     file.close();
 
-    if (layers.isEmpty()) {
-        QMessageBox::warning(this, QStringLiteral("警告"), QStringLiteral("未在文件中解析出有效的地层数据！"));
-        return;
-    }
+    if (layers.isEmpty()) return;
 
     // =========================================================
-    // 1. 构建垂直阶梯剖面坐标 (X: Vs, Y: Depth)
+    // 1. 刷新右侧表格
     // =========================================================
-    std::vector<double> x_vs;
-    std::vector<double> y_depth;
-
     tableVsModel->setRowCount(layers.size());
-
     double maxDepth = 0.0;
     for (int i = 0; i < layers.size(); ++i) {
         const auto& l = layers[i];
-
-        // 填充右侧表格
         tableVsModel->setItem(i, 0, new QTableWidgetItem(QString::number(l.layer)));
         tableVsModel->setItem(i, 1, new QTableWidgetItem(l.thk > 0 ? QString::number(l.thk, 'f', 1) : QStringLiteral("无限")));
         tableVsModel->setItem(i, 2, new QTableWidgetItem(QString::number(l.depthTop, 'f', 1)));
         tableVsModel->setItem(i, 3, new QTableWidgetItem(QString::number(l.vs, 'f', 1)));
         tableVsModel->setItem(i, 4, new QTableWidgetItem(QString::number(l.vp, 'f', 1)));
 
-        // 表格文字居中
         for (int c = 0; c < 5; ++c) {
             tableVsModel->item(i, c)->setTextAlignment(Qt::AlignCenter);
         }
 
-        // 计算该层顶底深度
-        double zTop = l.depthTop;
-        double zBottom = (l.thk > 0) ? (zTop + l.thk) : (zTop + 12.0); // 最后一层半空间向下延伸 12m
-
+        double zBottom = (l.thk > 0) ? (l.depthTop + l.thk) : (l.depthTop + 12.0);
         maxDepth = std::max(maxDepth, zBottom);
-
-        // 构造垂直台阶点对：(Vs, zTop) -> (Vs, zBottom)
-        x_vs.push_back(l.vs);
-        y_depth.push_back(zTop);
-
-        x_vs.push_back(l.vs);
-        y_depth.push_back(zBottom);
     }
 
     // =========================================================
-    // 2. 绘制 1D 阶梯折线 (在 Plot1D 上)
+    // 2. 【核心修复】：使用 QCPCurve 代替 QCPGraph 绘制垂直阶梯图
+    // QCPCurve 严格按点的加入顺序连接，绝对不会按 X 坐标重排导致折线交叉！
     // =========================================================
-    plotVsProfile->setData(x_vs, y_depth, QStringLiteral("反演横波速度剖面 (Inverted Vs)"));
+    plotVsProfile->clearPlottables(); // 清空原有图层
 
-    // 设置阶梯曲线样式：深蓝色粗线条
-    // 隐藏折线上的圆圈散点，改为纯净的平滑阶梯线
-    if (plotVsProfile->graphCount() > 0) {
-        plotVsProfile->graph(0)->setName(QStringLiteral("反演地层模型 (Inverted)"));
-        plotVsProfile->graph(0)->setScatterStyle(QCPScatterStyle::ssNone); // 去除折点圆圈
-        QPen p(QColor(2, 132, 199), 2.5);
-        plotVsProfile->graph(0)->setPen(p);
+    QCPCurve* vsStepCurve = new QCPCurve(plotVsProfile->xAxis, plotVsProfile->yAxis);
+    QVector<QCPCurveData> curveData;
+    int ptIdx = 0;
+
+    double vsMinVal = 1e9, vsMaxVal = -1e9;
+
+    for (int i = 0; i < layers.size(); ++i) {
+        const auto& l = layers[i];
+        double zTop = l.depthTop;
+        double zBottom = (l.thk > 0) ? (zTop + l.thk) : (zTop + 12.0);
+
+        vsMinVal = std::min(vsMinVal, l.vs);
+        vsMaxVal = std::max(vsMaxVal, l.vs);
+
+        // 点 1: 顶面 (vs, zTop)
+        curveData.append(QCPCurveData(ptIdx++, l.vs, zTop));
+        // 点 2: 底面 (vs, zBottom)
+        curveData.append(QCPCurveData(ptIdx++, l.vs, zBottom));
     }
 
-    // 坐标轴范围自适应
+    vsStepCurve->data()->set(curveData, true); // true 表示数据已按时间/顺序排好
+    vsStepCurve->setPen(QPen(QColor(2, 132, 199), 2.5)); // 经典亮蓝色阶梯线
+    vsStepCurve->setName(QStringLiteral("反演地层模型 (Inverted Vs)"));
+
+    // 坐标轴设定
     plotVsProfile->xAxis->setLabel(QStringLiteral("横波速度 Vs (m/s)"));
     plotVsProfile->yAxis->setLabel(QStringLiteral("地下深度 Depth (m)"));
-    plotVsProfile->yAxis->setRangeReversed(true); // 保证深度向下为正
+    plotVsProfile->yAxis->setRangeReversed(true); // 深度向下为正
 
-    double vsMin = *std::min_element(x_vs.begin(), x_vs.end());
-    double vsMax = *std::max_element(x_vs.begin(), x_vs.end());
-    plotVsProfile->xAxis->setRange(vsMin - 40.0, vsMax + 40.0);
+    plotVsProfile->xAxis->setRange(vsMinVal - 40.0, vsMaxVal + 40.0);
     plotVsProfile->yAxis->setRange(0.0, maxDepth);
 
     plotVsProfile->replot();
 
-    // 3. 更新底栏摘要
+    // 3. 摘要更新
     lblVsSummary->setText(QStringLiteral("已成功载入: %1 层模型 | 探测最大深度: %2 m | 基底 Vs: %3 m/s")
-        .arg(layers.size())
-        .arg(maxDepth, 0, 'f', 1)
-        .arg(layers.last().vs, 0, 'f', 1));
+        .arg(layers.size()).arg(maxDepth, 0, 'f', 1).arg(layers.last().vs, 0, 'f', 1));
 
-    textLog->append(QStringLiteral("[%1] 速度剖面展示就绪: 成功读取反演地质模型 %2，共 %3 层。")
-        .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
-        .arg(QFileInfo(filePath).fileName())
-        .arg(layers.size()));
-
-    // 自动切换到 Tab 4
     mainTabWidget->setCurrentWidget(inversionContainer);
 }
 

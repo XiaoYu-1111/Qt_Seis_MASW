@@ -1,9 +1,10 @@
 
-pytorch2.14.0+cu126:¼Ù
-¹
+pytorch2.14.0+cu126:éÚ
+Ì
 input
 head.0.weight
-head.0.biasgetitemnode_Conv_127"Conv*
+head.0.biasgetitemnode_Conv_127"Conv*
+kernel_shape@@ *
 group *
 auto_pad"NOTSET *
 	dilations@@ *
@@ -13,32 +14,33 @@
 !pkg.onnxscript.rewriter.rule_nameFuseBatchNormIntoConvJÊ
 pkg.torch.onnx.class_hierarchy§['__main__.DispersionRidgeNet', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.batchnorm.BatchNorm2d', 'aten._native_batch_norm_legit_no_training.default']J 
 pkg.torch.onnx.fx_node…%_native_batch_norm_legit_no_training : [num_users=1] = call_function[target=torch.ops.aten._native_batch_norm_legit_no_training.default](args = (%conv2d, %p_head_1_weight, %p_head_1_bias, %b_head_1_running_mean, %b_head_1_running_var, 0.1, 1e-05), kwargs = {})J\
-pkg.torch.onnx.name_scopes>['', 'head', 'head.1', '_native_batch_norm_legit_no_training']J¬
-pkg.torch.onnx.stack_traceFile "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 52, in forward
+pkg.torch.onnx.name_scopes>['', 'head', 'head.1', '_native_batch_norm_legit_no_training']J¨
+pkg.torch.onnx.stack_trace‰File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 52, in forward
     x = self.head(x)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
     return F.batch_norm(
-Ô
+Ğ
 getitem
 leaky_relunode_leaky_relu"	LeakyRelu*
 alphaÍÌL> J©
 	namespace›: __main__.DispersionRidgeNet/head: torch.nn.modules.container.Sequential/head.2: torch.nn.modules.activation.LeakyReLU/leaky_relu: aten.leaky_relu.defaultJ¯
 pkg.torch.onnx.class_hierarchyŒ['__main__.DispersionRidgeNet', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.activation.LeakyReLU', 'aten.leaky_relu.default']J”
 pkg.torch.onnx.fx_nodez%leaky_relu : [num_users=2] = call_function[target=torch.ops.aten.leaky_relu.default](args = (%getitem, 0.2), kwargs = {})JB
-pkg.torch.onnx.name_scopes$['', 'head', 'head.2', 'leaky_relu']JÖ
-pkg.torch.onnx.stack_trace·File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 52, in forward
+pkg.torch.onnx.name_scopes$['', 'head', 'head.2', 'leaky_relu']JÒ
+pkg.torch.onnx.stack_trace³File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 52, in forward
     x = self.head(x)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
     return F.leaky_relu(input, self.negative_slope, self.inplace)
-á
+ô
 
 leaky_relu
 res1.conv.0.weight
-res1.conv.0.weight_bias	getitem_3node_Conv_129"Conv*
+res1.conv.0.weight_bias	getitem_3node_Conv_129"Conv*
+kernel_shape@@ *
 group *
 auto_pad"NOTSET *
 	dilations@@ *
@@ -48,35 +50,36 @@ leaky_relu
 !pkg.onnxscript.rewriter.rule_name1FuseBatchNormIntoConv, RemoveOptionalBiasFromConvJä
 pkg.torch.onnx.class_hierarchyÁ['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.batchnorm.BatchNorm2d', 'aten._native_batch_norm_legit_no_training.default']J¸
 pkg.torch.onnx.fx_node%_native_batch_norm_legit_no_training_1 : [num_users=1] = call_function[target=torch.ops.aten._native_batch_norm_legit_no_training.default](args = (%conv2d_1, %p_res1_conv_1_weight, %p_res1_conv_1_bias, %b_res1_conv_1_running_mean, %b_res1_conv_1_running_var, 0.1, 1e-05), kwargs = {})Jp
-pkg.torch.onnx.name_scopesR['', 'res1', 'res1.conv', 'res1.conv.1', '_native_batch_norm_legit_no_training_1']J±
-pkg.torch.onnx.stack_trace’File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 53, in forward
+pkg.torch.onnx.name_scopesR['', 'res1', 'res1.conv', 'res1.conv.1', '_native_batch_norm_legit_no_training_1']J­
+pkg.torch.onnx.stack_traceFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 53, in forward
     x = self.res1(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
     return F.batch_norm(
-º
+¶
 
 	getitem_3leaky_relu_1node_leaky_relu_1"	LeakyRelu*
 alphaÍÌL> JÒ
 	namespaceÄ: __main__.DispersionRidgeNet/res1: __main__.ResidualBlock/res1.conv: torch.nn.modules.container.Sequential/res1.conv.2: torch.nn.modules.activation.LeakyReLU/leaky_relu_1: aten.leaky_relu.defaultJÉ
 pkg.torch.onnx.class_hierarchy¦['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.activation.LeakyReLU', 'aten.leaky_relu.default']J˜
 pkg.torch.onnx.fx_node~%leaky_relu_1 : [num_users=1] = call_function[target=torch.ops.aten.leaky_relu.default](args = (%getitem_3, 0.2), kwargs = {})JV
-pkg.torch.onnx.name_scopes8['', 'res1', 'res1.conv', 'res1.conv.2', 'leaky_relu_1']JÛ
-pkg.torch.onnx.stack_trace¼File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 53, in forward
+pkg.torch.onnx.name_scopes8['', 'res1', 'res1.conv', 'res1.conv.2', 'leaky_relu_1']J×
+pkg.torch.onnx.stack_trace¸File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 53, in forward
     x = self.res1(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
     return F.leaky_relu(input, self.negative_slope, self.inplace)
-ã
+ö
 leaky_relu_1
 res1.conv.3.weight
-res1.conv.3.weight_bias	getitem_6node_Conv_131"Conv*
+res1.conv.3.weight_bias	getitem_6node_Conv_131"Conv*
+kernel_shape@@ *
 group *
 auto_pad"NOTSET *
 	dilations@@ *
@@ -86,14 +89,14 @@ leaky_relu
 !pkg.onnxscript.rewriter.rule_name1FuseBatchNormIntoConv, RemoveOptionalBiasFromConvJä
 pkg.torch.onnx.class_hierarchyÁ['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.batchnorm.BatchNorm2d', 'aten._native_batch_norm_legit_no_training.default']J¸
 pkg.torch.onnx.fx_node%_native_batch_norm_legit_no_training_2 : [num_users=1] = call_function[target=torch.ops.aten._native_batch_norm_legit_no_training.default](args = (%conv2d_2, %p_res1_conv_4_weight, %p_res1_conv_4_bias, %b_res1_conv_4_running_mean, %b_res1_conv_4_running_var, 0.1, 1e-05), kwargs = {})Jp
-pkg.torch.onnx.name_scopesR['', 'res1', 'res1.conv', 'res1.conv.4', '_native_batch_norm_legit_no_training_2']J±
-pkg.torch.onnx.stack_trace’File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 53, in forward
+pkg.torch.onnx.name_scopesR['', 'res1', 'res1.conv', 'res1.conv.4', '_native_batch_norm_legit_no_training_2']J­
+pkg.torch.onnx.stack_traceFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 53, in forward
     x = self.res1(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
     return F.batch_norm(
 Õ
 
@@ -103,27 +106,28 @@ leaky_relu
 pkg.torch.onnx.class_hierarchyL['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'aten.add.Tensor']J
 pkg.torch.onnx.fx_nodeu%add : [num_users=1] = call_function[target=torch.ops.aten.add.Tensor](args = (%leaky_relu, %getitem_6), kwargs = {})J1
 pkg.torch.onnx.name_scopes['', 'res1', 'add']J”
-pkg.torch.onnx.stack_traceõFile "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 53, in forward
+pkg.torch.onnx.stack_traceõFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 53, in forward
     x = self.res1(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-³
+±
 addleaky_relu_2node_leaky_relu_2"	LeakyRelu*
 alphaÍÌL> JŸ
 	namespace‘: __main__.DispersionRidgeNet/res1: __main__.ResidualBlock/res1.relu: torch.nn.modules.activation.LeakyReLU/leaky_relu_2: aten.leaky_relu.defaultJŸ
 pkg.torch.onnx.class_hierarchy}['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.activation.LeakyReLU', 'aten.leaky_relu.default']J’
 pkg.torch.onnx.fx_nodex%leaky_relu_2 : [num_users=2] = call_function[target=torch.ops.aten.leaky_relu.default](args = (%add, 0.2), kwargs = {})JG
-pkg.torch.onnx.name_scopes)['', 'res1', 'res1.relu', 'leaky_relu_2']JÌ
-pkg.torch.onnx.stack_trace­File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 53, in forward
+pkg.torch.onnx.name_scopes)['', 'res1', 'res1.relu', 'leaky_relu_2']JÊ
+pkg.torch.onnx.stack_trace«File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 53, in forward
     x = self.res1(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
     return F.leaky_relu(input, self.negative_slope, self.inplace)
-ã
+ö
 leaky_relu_2
 res2.conv.0.weight
-res2.conv.0.weight_bias	getitem_9node_Conv_133"Conv*
+res2.conv.0.weight_bias	getitem_9node_Conv_133"Conv*
+kernel_shape@@ *
 group *
 auto_pad"NOTSET *
 	dilations@@ *
@@ -133,36 +137,37 @@ leaky_relu
 !pkg.onnxscript.rewriter.rule_name1FuseBatchNormIntoConv, RemoveOptionalBiasFromConvJä
 pkg.torch.onnx.class_hierarchyÁ['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.batchnorm.BatchNorm2d', 'aten._native_batch_norm_legit_no_training.default']J¸
 pkg.torch.onnx.fx_node%_native_batch_norm_legit_no_training_3 : [num_users=1] = call_function[target=torch.ops.aten._native_batch_norm_legit_no_training.default](args = (%conv2d_3, %p_res2_conv_1_weight, %p_res2_conv_1_bias, %b_res2_conv_1_running_mean, %b_res2_conv_1_running_var, 0.1, 1e-05), kwargs = {})Jp
-pkg.torch.onnx.name_scopesR['', 'res2', 'res2.conv', 'res2.conv.1', '_native_batch_norm_legit_no_training_3']J±
-pkg.torch.onnx.stack_trace’File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 54, in forward
+pkg.torch.onnx.name_scopesR['', 'res2', 'res2.conv', 'res2.conv.1', '_native_batch_norm_legit_no_training_3']J­
+pkg.torch.onnx.stack_traceFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 54, in forward
     x = self.res2(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
     return F.batch_norm(
-º
+¶
 
 	getitem_9leaky_relu_3node_leaky_relu_3"	LeakyRelu*
 alphaÍÌL> JÒ
 	namespaceÄ: __main__.DispersionRidgeNet/res2: __main__.ResidualBlock/res2.conv: torch.nn.modules.container.Sequential/res2.conv.2: torch.nn.modules.activation.LeakyReLU/leaky_relu_3: aten.leaky_relu.defaultJÉ
 pkg.torch.onnx.class_hierarchy¦['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.activation.LeakyReLU', 'aten.leaky_relu.default']J˜
 pkg.torch.onnx.fx_node~%leaky_relu_3 : [num_users=1] = call_function[target=torch.ops.aten.leaky_relu.default](args = (%getitem_9, 0.2), kwargs = {})JV
-pkg.torch.onnx.name_scopes8['', 'res2', 'res2.conv', 'res2.conv.2', 'leaky_relu_3']JÛ
-pkg.torch.onnx.stack_trace¼File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 54, in forward
+pkg.torch.onnx.name_scopes8['', 'res2', 'res2.conv', 'res2.conv.2', 'leaky_relu_3']J×
+pkg.torch.onnx.stack_trace¸File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 54, in forward
     x = self.res2(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
     return F.leaky_relu(input, self.negative_slope, self.inplace)
-ä
+÷
 leaky_relu_3
 res2.conv.3.weight
 res2.conv.3.weight_bias
-getitem_12node_Conv_135"Conv*
+getitem_12node_Conv_135"Conv*
+kernel_shape@@ *
 group *
 auto_pad"NOTSET *
 	dilations@@ *
@@ -172,14 +177,14 @@ getitem_12node_Conv_135"Conv*
 !pkg.onnxscript.rewriter.rule_name1FuseBatchNormIntoConv, RemoveOptionalBiasFromConvJä
 pkg.torch.onnx.class_hierarchyÁ['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.batchnorm.BatchNorm2d', 'aten._native_batch_norm_legit_no_training.default']J¸
 pkg.torch.onnx.fx_node%_native_batch_norm_legit_no_training_4 : [num_users=1] = call_function[target=torch.ops.aten._native_batch_norm_legit_no_training.default](args = (%conv2d_4, %p_res2_conv_4_weight, %p_res2_conv_4_bias, %b_res2_conv_4_running_mean, %b_res2_conv_4_running_var, 0.1, 1e-05), kwargs = {})Jp
-pkg.torch.onnx.name_scopesR['', 'res2', 'res2.conv', 'res2.conv.4', '_native_batch_norm_legit_no_training_4']J±
-pkg.torch.onnx.stack_trace’File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 54, in forward
+pkg.torch.onnx.name_scopesR['', 'res2', 'res2.conv', 'res2.conv.4', '_native_batch_norm_legit_no_training_4']J­
+pkg.torch.onnx.stack_traceFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 54, in forward
     x = self.res2(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
     return F.batch_norm(
 å
 leaky_relu_2
@@ -190,28 +195,29 @@ node_add_1"AddJ^
 pkg.torch.onnx.class_hierarchyL['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'aten.add.Tensor']J”
 pkg.torch.onnx.fx_nodez%add_1 : [num_users=1] = call_function[target=torch.ops.aten.add.Tensor](args = (%leaky_relu_2, %getitem_12), kwargs = {})J3
 pkg.torch.onnx.name_scopes['', 'res2', 'add_1']J”
-pkg.torch.onnx.stack_traceõFile "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 54, in forward
+pkg.torch.onnx.stack_traceõFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 54, in forward
     x = self.res2(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-·
+µ
 add_1leaky_relu_4node_leaky_relu_4"	LeakyRelu*
 alphaÍÌL> JŸ
 	namespace‘: __main__.DispersionRidgeNet/res2: __main__.ResidualBlock/res2.relu: torch.nn.modules.activation.LeakyReLU/leaky_relu_4: aten.leaky_relu.defaultJŸ
 pkg.torch.onnx.class_hierarchy}['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.activation.LeakyReLU', 'aten.leaky_relu.default']J”
 pkg.torch.onnx.fx_nodez%leaky_relu_4 : [num_users=2] = call_function[target=torch.ops.aten.leaky_relu.default](args = (%add_1, 0.2), kwargs = {})JG
-pkg.torch.onnx.name_scopes)['', 'res2', 'res2.relu', 'leaky_relu_4']JÌ
-pkg.torch.onnx.stack_trace­File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 54, in forward
+pkg.torch.onnx.name_scopes)['', 'res2', 'res2.relu', 'leaky_relu_4']JÊ
+pkg.torch.onnx.stack_trace«File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 54, in forward
     x = self.res2(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
     return F.leaky_relu(input, self.negative_slope, self.inplace)
-ä
+÷
 leaky_relu_4
 res3.conv.0.weight
 res3.conv.0.weight_bias
-getitem_15node_Conv_137"Conv*
+getitem_15node_Conv_137"Conv*
+kernel_shape@@ *
 group *
 auto_pad"NOTSET *
 	dilations@@ *
@@ -221,16 +227,16 @@ getitem_15node_Conv_137"Conv*
 !pkg.onnxscript.rewriter.rule_name1FuseBatchNormIntoConv, RemoveOptionalBiasFromConvJä
 pkg.torch.onnx.class_hierarchyÁ['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.batchnorm.BatchNorm2d', 'aten._native_batch_norm_legit_no_training.default']J¸
 pkg.torch.onnx.fx_node%_native_batch_norm_legit_no_training_5 : [num_users=1] = call_function[target=torch.ops.aten._native_batch_norm_legit_no_training.default](args = (%conv2d_5, %p_res3_conv_1_weight, %p_res3_conv_1_bias, %b_res3_conv_1_running_mean, %b_res3_conv_1_running_var, 0.1, 1e-05), kwargs = {})Jp
-pkg.torch.onnx.name_scopesR['', 'res3', 'res3.conv', 'res3.conv.1', '_native_batch_norm_legit_no_training_5']J±
-pkg.torch.onnx.stack_trace’File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 55, in forward
+pkg.torch.onnx.name_scopesR['', 'res3', 'res3.conv', 'res3.conv.1', '_native_batch_norm_legit_no_training_5']J­
+pkg.torch.onnx.stack_traceFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 55, in forward
     x = self.res3(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
     return F.batch_norm(
-¼
+¸
 
 
 getitem_15leaky_relu_5node_leaky_relu_5"	LeakyRelu*
@@ -238,20 +244,21 @@ getitem_15leaky_relu_5node_leaky_relu_5"	LeakyRelu*
 	namespaceÄ: __main__.DispersionRidgeNet/res3: __main__.ResidualBlock/res3.conv: torch.nn.modules.container.Sequential/res3.conv.2: torch.nn.modules.activation.LeakyReLU/leaky_relu_5: aten.leaky_relu.defaultJÉ
 pkg.torch.onnx.class_hierarchy¦['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.activation.LeakyReLU', 'aten.leaky_relu.default']J™
 pkg.torch.onnx.fx_node%leaky_relu_5 : [num_users=1] = call_function[target=torch.ops.aten.leaky_relu.default](args = (%getitem_15, 0.2), kwargs = {})JV
-pkg.torch.onnx.name_scopes8['', 'res3', 'res3.conv', 'res3.conv.2', 'leaky_relu_5']JÛ
-pkg.torch.onnx.stack_trace¼File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 55, in forward
+pkg.torch.onnx.name_scopes8['', 'res3', 'res3.conv', 'res3.conv.2', 'leaky_relu_5']J×
+pkg.torch.onnx.stack_trace¸File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 55, in forward
     x = self.res3(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
     return F.leaky_relu(input, self.negative_slope, self.inplace)
-ä
+÷
 leaky_relu_5
 res3.conv.3.weight
 res3.conv.3.weight_bias
-getitem_18node_Conv_139"Conv*
+getitem_18node_Conv_139"Conv*
+kernel_shape@@ *
 group *
 auto_pad"NOTSET *
 	dilations@@ *
@@ -261,14 +268,14 @@ getitem_18node_Conv_139"Conv*
 !pkg.onnxscript.rewriter.rule_name1FuseBatchNormIntoConv, RemoveOptionalBiasFromConvJä
 pkg.torch.onnx.class_hierarchyÁ['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.batchnorm.BatchNorm2d', 'aten._native_batch_norm_legit_no_training.default']J¸
 pkg.torch.onnx.fx_node%_native_batch_norm_legit_no_training_6 : [num_users=1] = call_function[target=torch.ops.aten._native_batch_norm_legit_no_training.default](args = (%conv2d_6, %p_res3_conv_4_weight, %p_res3_conv_4_bias, %b_res3_conv_4_running_mean, %b_res3_conv_4_running_var, 0.1, 1e-05), kwargs = {})Jp
-pkg.torch.onnx.name_scopesR['', 'res3', 'res3.conv', 'res3.conv.4', '_native_batch_norm_legit_no_training_6']J±
-pkg.torch.onnx.stack_trace’File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 55, in forward
+pkg.torch.onnx.name_scopesR['', 'res3', 'res3.conv', 'res3.conv.4', '_native_batch_norm_legit_no_training_6']J­
+pkg.torch.onnx.stack_traceFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 55, in forward
     x = self.res3(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
     return F.batch_norm(
 å
 leaky_relu_4
@@ -279,28 +286,29 @@ node_add_2"AddJ^
 pkg.torch.onnx.class_hierarchyL['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'aten.add.Tensor']J”
 pkg.torch.onnx.fx_nodez%add_2 : [num_users=1] = call_function[target=torch.ops.aten.add.Tensor](args = (%leaky_relu_4, %getitem_18), kwargs = {})J3
 pkg.torch.onnx.name_scopes['', 'res3', 'add_2']J”
-pkg.torch.onnx.stack_traceõFile "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 55, in forward
+pkg.torch.onnx.stack_traceõFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 55, in forward
     x = self.res3(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-·
+µ
 add_2leaky_relu_6node_leaky_relu_6"	LeakyRelu*
 alphaÍÌL> JŸ
 	namespace‘: __main__.DispersionRidgeNet/res3: __main__.ResidualBlock/res3.relu: torch.nn.modules.activation.LeakyReLU/leaky_relu_6: aten.leaky_relu.defaultJŸ
 pkg.torch.onnx.class_hierarchy}['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.activation.LeakyReLU', 'aten.leaky_relu.default']J”
 pkg.torch.onnx.fx_nodez%leaky_relu_6 : [num_users=2] = call_function[target=torch.ops.aten.leaky_relu.default](args = (%add_2, 0.2), kwargs = {})JG
-pkg.torch.onnx.name_scopes)['', 'res3', 'res3.relu', 'leaky_relu_6']JÌ
-pkg.torch.onnx.stack_trace­File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 55, in forward
+pkg.torch.onnx.name_scopes)['', 'res3', 'res3.relu', 'leaky_relu_6']JÊ
+pkg.torch.onnx.stack_trace«File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 55, in forward
     x = self.res3(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
     return F.leaky_relu(input, self.negative_slope, self.inplace)
-ä
+÷
 leaky_relu_6
 res4.conv.0.weight
 res4.conv.0.weight_bias
-getitem_21node_Conv_141"Conv*
+getitem_21node_Conv_141"Conv*
+kernel_shape@@ *
 group *
 auto_pad"NOTSET *
 	dilations@@ *
@@ -310,16 +318,16 @@ getitem_21node_Conv_141"Conv*
 !pkg.onnxscript.rewriter.rule_name1FuseBatchNormIntoConv, RemoveOptionalBiasFromConvJä
 pkg.torch.onnx.class_hierarchyÁ['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.batchnorm.BatchNorm2d', 'aten._native_batch_norm_legit_no_training.default']J¸
 pkg.torch.onnx.fx_node%_native_batch_norm_legit_no_training_7 : [num_users=1] = call_function[target=torch.ops.aten._native_batch_norm_legit_no_training.default](args = (%conv2d_7, %p_res4_conv_1_weight, %p_res4_conv_1_bias, %b_res4_conv_1_running_mean, %b_res4_conv_1_running_var, 0.1, 1e-05), kwargs = {})Jp
-pkg.torch.onnx.name_scopesR['', 'res4', 'res4.conv', 'res4.conv.1', '_native_batch_norm_legit_no_training_7']J±
-pkg.torch.onnx.stack_trace’File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 56, in forward
+pkg.torch.onnx.name_scopesR['', 'res4', 'res4.conv', 'res4.conv.1', '_native_batch_norm_legit_no_training_7']J­
+pkg.torch.onnx.stack_traceFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 56, in forward
     x = self.res4(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
     return F.batch_norm(
-¼
+¸
 
 
 getitem_21leaky_relu_7node_leaky_relu_7"	LeakyRelu*
@@ -327,20 +335,21 @@ getitem_21leaky_relu_7node_leaky_relu_7"	LeakyRelu*
 	namespaceÄ: __main__.DispersionRidgeNet/res4: __main__.ResidualBlock/res4.conv: torch.nn.modules.container.Sequential/res4.conv.2: torch.nn.modules.activation.LeakyReLU/leaky_relu_7: aten.leaky_relu.defaultJÉ
 pkg.torch.onnx.class_hierarchy¦['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.activation.LeakyReLU', 'aten.leaky_relu.default']J™
 pkg.torch.onnx.fx_node%leaky_relu_7 : [num_users=1] = call_function[target=torch.ops.aten.leaky_relu.default](args = (%getitem_21, 0.2), kwargs = {})JV
-pkg.torch.onnx.name_scopes8['', 'res4', 'res4.conv', 'res4.conv.2', 'leaky_relu_7']JÛ
-pkg.torch.onnx.stack_trace¼File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 56, in forward
+pkg.torch.onnx.name_scopes8['', 'res4', 'res4.conv', 'res4.conv.2', 'leaky_relu_7']J×
+pkg.torch.onnx.stack_trace¸File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 56, in forward
     x = self.res4(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
     return F.leaky_relu(input, self.negative_slope, self.inplace)
-ä
+÷
 leaky_relu_7
 res4.conv.3.weight
 res4.conv.3.weight_bias
-getitem_24node_Conv_143"Conv*
+getitem_24node_Conv_143"Conv*
+kernel_shape@@ *
 group *
 auto_pad"NOTSET *
 	dilations@@ *
@@ -350,14 +359,14 @@ getitem_24node_Conv_143"Conv*
 !pkg.onnxscript.rewriter.rule_name1FuseBatchNormIntoConv, RemoveOptionalBiasFromConvJä
 pkg.torch.onnx.class_hierarchyÁ['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.batchnorm.BatchNorm2d', 'aten._native_batch_norm_legit_no_training.default']J¸
 pkg.torch.onnx.fx_node%_native_batch_norm_legit_no_training_8 : [num_users=1] = call_function[target=torch.ops.aten._native_batch_norm_legit_no_training.default](args = (%conv2d_8, %p_res4_conv_4_weight, %p_res4_conv_4_bias, %b_res4_conv_4_running_mean, %b_res4_conv_4_running_var, 0.1, 1e-05), kwargs = {})Jp
-pkg.torch.onnx.name_scopesR['', 'res4', 'res4.conv', 'res4.conv.4', '_native_batch_norm_legit_no_training_8']J±
-pkg.torch.onnx.stack_trace’File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 56, in forward
+pkg.torch.onnx.name_scopesR['', 'res4', 'res4.conv', 'res4.conv.4', '_native_batch_norm_legit_no_training_8']J­
+pkg.torch.onnx.stack_traceFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 56, in forward
     x = self.res4(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
     return F.batch_norm(
 å
 leaky_relu_6
@@ -368,28 +377,29 @@ node_add_3"AddJ^
 pkg.torch.onnx.class_hierarchyL['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'aten.add.Tensor']J”
 pkg.torch.onnx.fx_nodez%add_3 : [num_users=1] = call_function[target=torch.ops.aten.add.Tensor](args = (%leaky_relu_6, %getitem_24), kwargs = {})J3
 pkg.torch.onnx.name_scopes['', 'res4', 'add_3']J”
-pkg.torch.onnx.stack_traceõFile "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 56, in forward
+pkg.torch.onnx.stack_traceõFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 56, in forward
     x = self.res4(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-·
+µ
 add_3leaky_relu_8node_leaky_relu_8"	LeakyRelu*
 alphaÍÌL> JŸ
 	namespace‘: __main__.DispersionRidgeNet/res4: __main__.ResidualBlock/res4.relu: torch.nn.modules.activation.LeakyReLU/leaky_relu_8: aten.leaky_relu.defaultJŸ
 pkg.torch.onnx.class_hierarchy}['__main__.DispersionRidgeNet', '__main__.ResidualBlock', 'torch.nn.modules.activation.LeakyReLU', 'aten.leaky_relu.default']J”
 pkg.torch.onnx.fx_nodez%leaky_relu_8 : [num_users=1] = call_function[target=torch.ops.aten.leaky_relu.default](args = (%add_3, 0.2), kwargs = {})JG
-pkg.torch.onnx.name_scopes)['', 'res4', 'res4.relu', 'leaky_relu_8']JÌ
-pkg.torch.onnx.stack_trace­File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 56, in forward
+pkg.torch.onnx.name_scopes)['', 'res4', 'res4.relu', 'leaky_relu_8']JÊ
+pkg.torch.onnx.stack_trace«File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 56, in forward
     x = self.res4(x)
-  File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 18, in forward
+  File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 18, in forward
     return self.relu(x + self.conv(x))
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
     return F.leaky_relu(input, self.negative_slope, self.inplace)
-Î
+á
 leaky_relu_8
 tail.0.weight
 tail.0.bias
-getitem_27node_Conv_144"Conv*
+getitem_27node_Conv_144"Conv*
+kernel_shape@@ *
 group *
 auto_pad"NOTSET *
 	dilations@@ *
@@ -399,31 +409,32 @@ getitem_27node_Conv_144"Conv*
 !pkg.onnxscript.rewriter.rule_nameFuseBatchNormIntoConvJÊ
 pkg.torch.onnx.class_hierarchy§['__main__.DispersionRidgeNet', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.batchnorm.BatchNorm2d', 'aten._native_batch_norm_legit_no_training.default']J¤
 pkg.torch.onnx.fx_node‰%_native_batch_norm_legit_no_training_9 : [num_users=1] = call_function[target=torch.ops.aten._native_batch_norm_legit_no_training.default](args = (%conv2d_9, %p_tail_1_weight, %p_tail_1_bias, %b_tail_1_running_mean, %b_tail_1_running_var, 0.1, 1e-05), kwargs = {})J^
-pkg.torch.onnx.name_scopes@['', 'tail', 'tail.1', '_native_batch_norm_legit_no_training_9']J¯
-pkg.torch.onnx.stack_traceFile "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 57, in forward
+pkg.torch.onnx.name_scopes@['', 'tail', 'tail.1', '_native_batch_norm_legit_no_training_9']J«
+pkg.torch.onnx.stack_traceŒFile "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 57, in forward
     return self.tail(x)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\batchnorm.py", line 210, in forward
     return F.batch_norm(
-ç
+ã
 
 getitem_27leaky_relu_9node_leaky_relu_9"	LeakyRelu*
 alphaÍÌL> J«
 	namespace: __main__.DispersionRidgeNet/tail: torch.nn.modules.container.Sequential/tail.2: torch.nn.modules.activation.LeakyReLU/leaky_relu_9: aten.leaky_relu.defaultJ¯
 pkg.torch.onnx.class_hierarchyŒ['__main__.DispersionRidgeNet', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.activation.LeakyReLU', 'aten.leaky_relu.default']J™
 pkg.torch.onnx.fx_node%leaky_relu_9 : [num_users=1] = call_function[target=torch.ops.aten.leaky_relu.default](args = (%getitem_27, 0.2), kwargs = {})JD
-pkg.torch.onnx.name_scopes&['', 'tail', 'tail.2', 'leaky_relu_9']JÙ
-pkg.torch.onnx.stack_traceºFile "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 57, in forward
+pkg.torch.onnx.name_scopes&['', 'tail', 'tail.2', 'leaky_relu_9']JÕ
+pkg.torch.onnx.stack_trace¶File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 57, in forward
     return self.tail(x)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 923, in forward
     return F.leaky_relu(input, self.negative_slope, self.inplace)
-´	
+Ç	
 leaky_relu_9
 tail.3.weight
-tail.3.bias	conv2d_10node_conv2d_10"Conv*
+tail.3.bias	conv2d_10node_conv2d_10"Conv*
+kernel_shape@@ *
 group *
 auto_pad"NOTSET *
 	dilations@@ *
@@ -432,29 +443,29 @@ getitem_27leaky_relu_9node_leaky_relu_9"	LeakyRelu*
 	namespace: __main__.DispersionRidgeNet/tail: torch.nn.modules.container.Sequential/tail.3: torch.nn.modules.conv.Conv2d/conv2d_10: aten.conv2d.defaultJ¡
 pkg.torch.onnx.class_hierarchy['__main__.DispersionRidgeNet', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.conv.Conv2d', 'aten.conv2d.default']J²
 pkg.torch.onnx.fx_node—%conv2d_10 : [num_users=1] = call_function[target=torch.ops.aten.conv2d.default](args = (%leaky_relu_9, %p_tail_3_weight, %p_tail_3_bias), kwargs = {})JA
-pkg.torch.onnx.name_scopes#['', 'tail', 'tail.3', 'conv2d_10']JÎ
-pkg.torch.onnx.stack_trace¯File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 57, in forward
+pkg.torch.onnx.name_scopes#['', 'tail', 'tail.3', 'conv2d_10']JÊ
+pkg.torch.onnx.stack_trace«File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 57, in forward
     return self.tail(x)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\conv.py", line 565, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\conv.py", line 565, in forward
     return self._conv_forward(input, self.weight, self.bias)
-…
+
 	conv2d_10outputnode_sigmoid"SigmoidJ¡
 	namespace“: __main__.DispersionRidgeNet/tail: torch.nn.modules.container.Sequential/tail.4: torch.nn.modules.activation.Sigmoid/sigmoid: aten.sigmoid.defaultJª
 pkg.torch.onnx.class_hierarchy‡['__main__.DispersionRidgeNet', 'torch.nn.modules.container.Sequential', 'torch.nn.modules.activation.Sigmoid', 'aten.sigmoid.default']JŒ
 pkg.torch.onnx.fx_noder%sigmoid : [num_users=1] = call_function[target=torch.ops.aten.sigmoid.default](args = (%conv2d_10,), kwargs = {})J?
-pkg.torch.onnx.name_scopes!['', 'tail', 'tail.4', 'sigmoid']J·
-pkg.torch.onnx.stack_trace˜File "C:\Users\12694\AppData\Local\Temp\ipykernel_20960\3906155357.py", line 57, in forward
+pkg.torch.onnx.name_scopes!['', 'tail', 'tail.4', 'sigmoid']J³
+pkg.torch.onnx.stack_trace”File "C:\Users\12694\AppData\Local\Temp\ipykernel_13076\3906155357.py", line 57, in forward
     return self.tail(x)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\container.py", line 259, in forward
     input = module(input)
-  File "c:\Users\12694\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 361, in forward
+  File "d:\MiniConda\miniconda3\envs\geo_ai\Lib\site-packages\torch\nn\modules\activation.py", line 361, in forward
     return torch.sigmoid(input)
 main_graph*a Bhead.0.weightj'
 locationdispersion_picker.onnx.dataj
 offset0j
-length1152p*” Bhead.0.biasJ€øãw?†ég¿—Y?4«M¿•Ù¾´t¿¼Ha?şà¿2/?´Ól?”9€¿ña?~5á¾}Ô_?àT?¿“~¿Š]?c[?õ†\?UëN?´„¿µdˆ¿Ë~u?¢i¿Ò‹N?_?šÙh¿yJA¿]¿ú[¿Wì‚¿rÇƒ¿*k  Bres1.conv.0.weightj'
+length1152p*” Bhead.0.biasJ€šùf¿ssv?]d¿8Xw¿ÒTt¿m\[¿rJ?V”e¿©C{¿.¼{¿÷H¿ş@?1w?&ôk?¾'z¿Ş°T¿ªÓ?5Uj?ßéw¿šöi¿µ²,¿Ï-R?Ì¨q¿ñ/r¿˜x¿=»b¿í ?º¿	±o?¸ši?ÙİG¿ì?f?*k  Bres1.conv.0.weightj'
 locationdispersion_picker.onnx.dataj
 offset19584j
 length36864p*k  Bres1.conv.3.weightj'
@@ -481,11 +492,13 @@ main_graph*a Bhead.0.weightj'
 length36864p*e Btail.0.weightj'
 locationdispersion_picker.onnx.dataj
 offset1152j
-length18432p*SBtail.0.biasJ@ªƒG¿İc¿Ÿ¾Ÿ•¿¡¾¿üZ©¿|ÿ‘¿rå¶¿@m¿Ïÿ?£H›¿H¬ ¿£jØ¿„Å}¿#›'?ÔU@*[Btail.3.weightJ@W‡¿¦®)¿8‚ş¾Èöå>Êù>ÍhŸ>?gá>b)˜>ÿ<˜> Ş¿ }œ>óä>›¥>G4²>¿Wí¾Ò;¿*Btail.3.biasJÆ½*  Bres1.conv.0.weight_biasJ€şäÀ¾„É>Qt_¿
-?ª	½ÓDŸ¿BNm=ó9>T3à¿Ì±¿…|Ğ¿yØF?@¬À¼Ü§	? Ñ9>…5¿5	?‰ ¿3œ{>=ª´?¯a?Á7D?B—…¿GÌŒ¾ãl?Ô¿İ>™£Œ¾˜Ê<İ:>$Ù=>†/?d‚.¿*  Bres1.conv.3.weight_biasJ€Õ>´çÚ¾ã£G?Y¿2!»¿b¾“i¸¾„1ì¾^ÊÊ¼#Ã>M(±¾6"¬=É†¿“??ë˜¾@ä©¾V¥¾?WHE>€Œ½!Ñ$¿¿Ò$œ>2›˜¿„GO¿¹¦>„h¢¼OÇL>ÂG®¿I!¿„a¶¾ÙpL¿²	¿*  Bres2.conv.0.weight_biasJ€;3@„C
-ÀèjÁ¿Eß÷¾ƒ˜ ¾ÂKç¿ œ¿¯j*¿Ñr?zæ>m.¿–0î¿°d«¾NB?ÍpÒ¿‰ş½g†?1ï=™j½¿Bº¾Ù¡å? ³>¹ÜŸ¾ôÀ¿›ê>|5¾Ç¤?ò«f¿Ga¾¾:Õ¿?	8¿‚u?*  Bres2.conv.3.weight_biasJ€†à?7Ò¢¾Íu¿è ¾9Gˆ¾P>‡›ú¾°c >I#É>ˆÏ‹?xe£¾Lìb?ØÎ2¿Y¿ñ€?d©ä¿äÔ¿aU^?]ƒ?æ¼¿=^Š>Û3D¿ÚŸ¹¾»‡¢¿¦+½¹8>ÈÜı>Ñ2¿¬ä’½ê÷<ÆB=¿ù.\?*  Bres3.conv.0.weight_biasJ€F•¾n}‚¾»2Œ>·„¿4ØĞ=ÈMf=m3?êf?cŸC¾ZÀq‘5¿JoI¿õ¾vÇÛ½"º)=¾C>û#z?yë½µGÅ?ı
-#¾
-W§¾Ì®=¿*=˜>Ã¾ËX&?`N?ÿÄŒ¿»¿•İ±?ÁV?”?zÕÁ¾*  Bres3.conv.3.weight_biasJ€õ/>A!Ì¾˜-¿¨¿•w¾B>$h]¿Îğ›¾ªl°<¼s?úmš¾‰¯Ë>xp¿^÷½bÔÄ>E‘¿²¶š>˜ï)?[Y1=Íz¿g½_›-¿³:Õ½'G™½züL¾­>>ş¾B~j¿X‚¾ªî*>ëç¿Ğ˜Ä;*  Bres4.conv.0.weight_biasJ€}®5¾PŸ¾ï¶¿íş¿Ğ\U?Ø>Äò¾sH¿¶l›?ÎFK?m] ¿`¡q?p·[>[S©?!ŠÀí ¿Ç2¢?ÂÎ!¿ÏhC¿b±>H@Zˆ'¿]@P®¿¼œŸz>¯_Ô?H±,?³Ş¿ÓÇ¿\É>šMS¿^ÁŒ?*  Bres4.conv.3.weight_biasJ€ÖÁ”>y’Ù¾:õ¾n7O¿¿XQ¿ç–=Â¿.¿&§¾„I¾»¿îI¿I—?äÕ‚?Å]¡¾.SŠ=â<U¿Íê­?ªÃ?ˆk—¾ ¿°Â;Q=¸ıg>çbè>Nó¼\?”.R¿@âT¿Í? èØ¾Ò.¿Üã?ZÇ
+length18432p*SBtail.0.biasJ@=Í¿ÅÑ?Š;²¿9ÇÜ?0€s?<K3@ÄVØ>Ú[½¿bÖë?$Ip?Èu€¿ÆåF?Ni??¼Ê™½|]?^è??*[Btail.3.weightJ@nñB<}€ç¾­s‡=©Ê¾4qÌ¾²jö¾Î­Ş¾‡ê–=Ì©¾¥Ù¾
+B¦<RÜ®¾ççè¾ÔÉˆ¾œ}½¾¿*Btail.3.biasJ
+ÔÊ½*  Bres1.conv.0.weight_biasJ€Éj> Á%>'¨b>jª–?€º¿Ié¿a¼!?ÂÖµ>O—»¿…3?>´>_ôW=ãª«¿nê«?Â'µ=±£¾^½ô4?¾çÁ‚¾~­‡¿òM?GTà¿"*¿Û€™¾rm>(cŒ¿àÚ¾>qÔ>Š¡p?÷»¼z'>ùg)¿*  Bres1.conv.3.weight_biasJ€»³3?Bş<qKE¿«'<¿ëÙ%¿ z1?£u‘¼8> N?*Ôõ¾úÔ ?xâ¶>ÉF‰>ì¿‡	¤=Šn¾>âz²½J¥?BU‚¿h¤L>¾Œñ:¾C™¿¸Ç<È}'>—˜u?‚ãÛ=Á†Ô¾üïƒ?3Ÿ>°ŠÍ?Æ„¿*  Bres2.conv.0.weight_biasJ€"%¿(ië;<?¢='?šY…¾À?şF¿~M3?øÍ€>qï_=§€¿yA>‘p¾´–œ=fh>Å ñ>[e?Á`¸>˜‹±¾ 4×¿½Ô¬¾§Ãİ>tÎİ>—l?¢ì>WÌÂ¿ˆ>¿®,?¦4š¾$>Ÿ¿æ{3Àcó?*  Bres2.conv.3.weight_biasJ€•m6?Èİ‚;±*Œ¿#Êè¿jÖ¿gC?ş•Z>6ÃV¿f¾
+ƒ½öî“>ç'I?2Ã÷>½y¿òê£>Ój%@a)?#Óe>(ûõ< »P¼”ø´¾„˜Õ>§S¿<ë:¿)'m½Ä	?[†?„Ìe¾ßº ?û]>QPÁ>}L
+¿*  Bres3.conv.0.weight_biasJ€â'œ>ó>Ò¾ûÌ³?—,?LG?ú	¿Šh½¾`5Š¾” ?bI§¿0¹8>³&?D>ë>@Ö¾ÖÌ>)š?šÎ¿şlr¾Rğ?·âv¿W3>¬¼õ»~?jº‡?%†0Àƒd?V™¿òÍ§¿ml?Pä?}Ñ?ÂĞ?*  Bres3.conv.3.weight_biasJ€°!¦¾K§R?ä>{ê
+¿øg ¾c“/¿ßZC¿ÌøÜ=äÖ¾'ŠY?ÄÎY½Nr›¾lQ·>¹ğ½ø>ô>"5Æ=Ü€–>ló‘=ÊgE¿~=»^±=6n	?2rÉ<6y¿¸d³»ÚW?èŒ=Y/^>á>†¦¾°š¿>2?*  Bres4.conv.0.weight_biasJ€¦Í@'¾?bd½D„?Q	¨>Q¸>?5?Ÿ@ô-?æËU?ç#?.ê<?bÓ¾h« ?†dñ?c¨¼>{£@± ?WT²?g*6¿,¹=%¢º?ÀìO<¥è> º>!ƒ?\v]?)˜?*Q¢?J‡˜¿äŠØ>æ5¡@Ú(b¿*  Bres4.conv.3.weight_biasJ€øçÕ>ã5r¿Z'	À¬N¾ø‚¼  ¿½S ¾OÔ¿º	ä=„»‚½‰x¿N¶$?’oC=@Š¾X3¿²ÙR¼Œ°“>ÆT"¿úPZ¿Ğ5”¾C
+ß¾Î±¿#³¾uï¿Şé>’>„>^µ>à¶>â‡Ö?À™¿ŒlQ½ZÇ
 input
 
 
