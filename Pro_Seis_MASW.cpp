@@ -1202,9 +1202,6 @@ void Pro_Seis_MASW::loadSegyFile(const QString& filePath)
     if (comboInvLayers) comboInvLayers->setCurrentIndex(3); // 默认选第4项: 六层模型
 }
 
-// ---------------------------------------------------------
-// 按钮点击：只需弹窗选路径，然后交给 loadSegyFile 执行
-// ---------------------------------------------------------
 void Pro_Seis_MASW::onOpenSegy()
 {
     QString fileName = QFileDialog::getOpenFileName(
