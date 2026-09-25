@@ -61,9 +61,9 @@ InversionResult RayleighInversionSolver::runInversion(
     result.freqs = freqs;
     result.obsVel = obsVel;
 
-    int N = params.layerH.size() + 1; // 6 层
+    int N = params.layerH.size() + 1;
 
-    // 1. 构建一阶平滑算子 L
+    // 1. 一阶平滑算子
     Eigen::MatrixXd L = Eigen::MatrixXd::Zero(N - 1, N);
     for (int i = 0; i < N - 1; ++i) {
         L(i, i) = -1.0;
@@ -71,25 +71,31 @@ InversionResult RayleighInversionSolver::runInversion(
     }
     Eigen::MatrixXd LtL = L.transpose() * L;
 
-    // 2. 初始模型：浅层取观测速度小值，深层取观测速度大值，平滑过渡
+    // 2. 观测速度极值
     double vMin = *std::min_element(obsVel.begin(), obsVel.end());
     double vMax = *std::max_element(obsVel.begin(), obsVel.end());
+
+    // =========================================================
+    // 【核心物理锁 1】：基底横波速度必须能支撑最大观测相速度！
+    // 瑞雷波速 ≈ 0.92 Vs，因此基底 Vs 绝对不能低于 vMax / 0.92
+    // =========================================================
+    double basementMinVs = std::max(params.vsMin, (vMax / 0.90));
 
     Eigen::VectorXd m(N);
     for (int i = 0; i < N; ++i) {
         double ratio = (N > 1) ? (double)i / (N - 1) : 0.0;
-        double initVal = (vMin * 1.0) + ratio * (vMax * 1.15 - vMin * 1.0);
-        m(i) = std::clamp(initVal, params.vsMin, params.vsMax);
+        double initVal = (vMin * 1.05) + ratio * (basementMinVs * 1.05 - vMin * 1.05);
+        m(i) = initVal;
     }
 
     std::vector<double> calcVel;
     double phi = computeObjective(freqs, obsVel, m, params, L, calcVel);
-    double mu = 1.0; // 初始适度阻尼
+    double mu = 2.0; // 增强初始阻尼，防止第一步冲出轨道
 
-    // 3. 迭代循环 (Levenberg-Marquardt)
+    // 3. 阻尼非线性反演循环
     int iter = 0;
     for (iter = 0; iter < params.maxIter; ++iter) {
-        // A. 差分求雅可比矩阵 J
+        // A. 数值差分计算雅可比敏感度矩阵 J
         Eigen::MatrixXd J(M, N);
         for (int j = 0; j < N; ++j) {
             double delta = std::max(1.0, 0.005 * m(j));
@@ -104,10 +110,10 @@ InversionResult RayleighInversionSolver::runInversion(
             }
         }
 
-        // B. 【核心修复】：动态平衡数据项与平滑项量级
+        // B. 自适应平滑项匹配
         Eigen::MatrixXd JtJ = J.transpose() * J;
         double scaleFactor = JtJ.trace() / std::max(1.0, LtL.trace());
-        double lambdaEff = params.lambdaReg * scaleFactor; // 保证平滑项起效
+        double lambdaEff = 0.05 * scaleFactor; // 加大平滑权重，压制层间无序倒转
 
         Eigen::MatrixXd H = JtJ + lambdaEff * LtL + mu * Eigen::MatrixXd::Identity(N, N);
 
@@ -116,18 +122,25 @@ InversionResult RayleighInversionSolver::runInversion(
 
         Eigen::VectorXd g = J.transpose() * r - lambdaEff * LtL * m;
 
-        // C. 解步长
         Eigen::VectorXd delta_m = H.ldlt().solve(g);
 
-        // D. 【核心保护】：限制单步最大变化量不超过 15%，防止冲出轨道
+        // C. 限制单步最大变化量不超过 12%
         for (int i = 0; i < N; ++i) {
-            double maxStep = m(i) * 0.15;
+            double maxStep = m(i) * 0.12;
             delta_m(i) = std::clamp(delta_m(i), -maxStep, maxStep);
         }
 
         Eigen::VectorXd m_trial = m + delta_m;
+
+        // D. 施加物理有界保护
         for (int i = 0; i < N; ++i) {
-            m_trial(i) = std::clamp(m_trial(i), params.vsMin, params.vsMax);
+            double lower = (i == N - 1) ? basementMinVs : params.vsMin; // 基底必须 >= basementMinVs
+            m_trial(i) = std::clamp(m_trial(i), lower, params.vsMax);
+
+            // 弱单调约束：深部层速度尽量不低于上一层，防止严重倒转诱发漏失波
+            if (i > 0 && m_trial(i) < m_trial(i - 1) * 0.90) {
+                m_trial(i) = m_trial(i - 1) * 0.90;
+            }
         }
 
         std::vector<double> trialCalcVel;
@@ -142,11 +155,10 @@ InversionResult RayleighInversionSolver::runInversion(
             if (delta_m.norm() < 0.2) break;
         }
         else {
-            mu = std::min(1e4, mu * 4.0);
+            mu = std::min(1e5, mu * 4.0);
         }
     }
 
-    // 4. 收尾
     result.iterations = iter + 1;
     result.vs.resize(N);
     for (int i = 0; i < N; ++i) result.vs[i] = m(i);

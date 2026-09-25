@@ -158,31 +158,43 @@ double RayleighForwardSolver::fastCalc(double x, double f, const LayerModel& mod
 // =========================================================
 double RayleighForwardSolver::brentRoot(const std::function<double(double)>& func, double x_guess, double x_min, double x_max)
 {
-    double step = 2.0;
-    double a = std::max(x_min, x_guess - step);
-    double b = std::min(x_max, x_guess + step);
-    double fa = func(a);
-    double fb = func(b);
+    // 优先在当前猜测值附近做精细微距变号搜索 (防止跨模态跳跃)
+    double a = x_guess, b = x_guess;
+    double fa = func(a), fb = fa;
+    bool foundBracket = false;
 
-    // 自动寻找变号区间 [a, b]
-    int search_iter = 0;
-    while (fa * fb > 0.0 && search_iter < 80) {
-        step *= 1.4;
-        a = std::max(x_min, x_guess - step);
-        b = std::min(x_max, x_guess + step);
-        fa = func(a);
-        fb = func(b);
-        search_iter++;
+    // 1. 先用小步长向两侧逐步试探 (步长 1.5 m/s)
+    for (double delta = 1.5; delta <= 30.0; delta += 1.5) {
+        double ta = std::max(x_min, x_guess - delta);
+        double tb = std::min(x_max, x_guess + delta);
+        double f_ta = func(ta);
+        double f_tb = func(tb);
+
+        if (f_ta * fa <= 0.0) { a = ta; b = x_guess; fb = fa; fa = f_ta; foundBracket = true; break; }
+        if (f_tb * fa <= 0.0) { a = x_guess; b = tb; fb = f_tb; foundBracket = true; break; }
     }
 
-    if (fa * fb > 0.0) return x_guess; // 未找到变号根，回退初始猜测
+    // 2. 若微距未找到，再适度放宽
+    if (!foundBracket) {
+        double step = 3.0;
+        for (int iter = 0; iter < 40; ++iter) {
+            a = std::max(x_min, x_guess - step);
+            b = std::min(x_max, x_guess + step);
+            fa = func(a);
+            fb = func(b);
+            if (fa * fb <= 0.0) { foundBracket = true; break; }
+            step *= 1.25;
+        }
+    }
 
-    // Brent 核心迭代
+    if (!foundBracket) return x_guess; // 保护：返回上一频点连续速度
+
+    // 3. Brent-Dekker 核心快速收敛
     double c = a, fc = fa;
     double d = b - a, e = d;
-    double tol = 1e-5;
+    double tol = 1e-4;
 
-    for (int iter = 0; iter < 100; ++iter) {
+    for (int iter = 0; iter < 80; ++iter) {
         if (fb * fc > 0.0) { c = a; fc = fa; d = b - a; e = d; }
         if (std::abs(fc) < std::abs(fb)) {
             a = b; b = c; c = a;
@@ -222,7 +234,6 @@ double RayleighForwardSolver::brentRoot(const std::function<double(double)>& fun
     }
     return b;
 }
-
 // =========================================================
 // 3. 理论频散曲线计算 (高频逆向追踪)
 // =========================================================

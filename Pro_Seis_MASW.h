@@ -104,6 +104,9 @@ private:
 
     void initStatusBar();                 // 初始化仪器级状态栏
 
+    // 辅助方法：多曲线自适应缩放重绘
+    void updateCurveComparisonView();
+
 private slots:
     // --- 核心业务槽函数 ---
     void onOpenSegy();                                // 打开并载入 SEGY 地震道集
@@ -192,6 +195,19 @@ private:
     bool           m_interpolateColorMap = false;     // 平滑插值开关 (默认 false 呈现清晰色块)
 
     // =====================================================
+// Tab 3: 频散曲线对比多图层与独立显隐控制
+// =====================================================
+    QWidget* curveCompareContainer = nullptr; // Tab 3 总容器
+    QCPGraph* graphTheoretical = nullptr; // 图层1: 理论基阶曲线 (红实线)
+    QCPGraph* graphPicked = nullptr; // 图层2: 实测拾取点 (蓝线红点)
+    QCPGraph* graphInverted = nullptr; // 图层3: 反演拟合曲线 (黑虚线)
+
+    QCheckBox* chkShowTheoretical = nullptr; // 控制理论线显隐
+    QCheckBox* chkShowPicked = nullptr; // 控制拾取线显隐
+    QCheckBox* chkShowInverted = nullptr; // 控制反演线显隐
+    QLabel* lblCurveMisfit = nullptr; // 实时显示拟合残差 RMSE
+
+    // =====================================================
     // 5. 底部运行日志面板 (Console Log Dock)
     // =====================================================
     QDockWidget* logDock = nullptr;
@@ -219,6 +235,8 @@ private:
 
     QPushButton* btnRunInversion = nullptr; // 开始 1D 速度反演按钮
 
+    QComboBox* comboInvLayers = nullptr; // 反演分层方案选择框 (两层/三层/六层...)
+
     // =====================================================
     // 7. 顶部工具栏数据看板胶囊标签 (Data Badges)
     // =====================================================
@@ -235,7 +253,12 @@ private:
     QLabel* statusChipGrid = nullptr; // 当前计算网格精细度
     QLabel* statusChipData = nullptr; // 内存地震数据规格
 
-    
+    enum DataSourceType {
+        SourceExternal = 0,    // 外部导入实测数据 (打开/拖拽 SEGY)
+        SourceSynthetic2L = 1, // 内部正演合成: 两层模型
+        SourceSynthetic3L = 2  // 内部正演合成: 三层模型
+    };
+    DataSourceType m_dataSourceType = SourceExternal; // 默认标记为外部数据
 
     protected:
         void dragEnterEvent(QDragEnterEvent* event) override;

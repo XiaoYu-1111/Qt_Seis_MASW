@@ -3,8 +3,6 @@
 #include "qcustomplot.h"
 #include "style.h"
 
-
-
 // 辅助函数：根据名称生成 QCustomPlot 色标渐变
 static QCPColorGradient getScientificGradient(const QString& type, bool invert = false)
 {
@@ -517,8 +515,92 @@ void Pro_Seis_MASW::initMainTabs()
     connect(plotDispersion, &QCustomPlot::mousePress, this, &Pro_Seis_MASW::onDispersionPlotClicked);
 
     // --- 页面 3: 提取的频散曲线对比 ---
-    plotCurve1D = new Data_show::Plot1D(this);
-    plotCurve1D->m_setName(QStringLiteral("频散曲线对比 (Dispersion Curves)"));
+    //plotCurve1D = new Data_show::Plot1D(this);
+    //plotCurve1D->m_setName(QStringLiteral("频散曲线对比 (Dispersion Curves)"));
+
+    // =========================================================
+    // --- 页面 3: 频散曲线多重对比 (Tab 3: Extracted Curves) ---
+    // =========================================================
+    curveCompareContainer = new QWidget(this);
+    QVBoxLayout* curveMainLayout = new QVBoxLayout(curveCompareContainer);
+    curveMainLayout->setContentsMargins(4, 4, 4, 4);
+    curveMainLayout->setSpacing(4);
+
+    // 1. 初始化 1D 图表画布
+    plotCurve1D = new Data_show::Plot1D(curveCompareContainer);
+    plotCurve1D->m_setName(QStringLiteral("多源频散曲线综合对比与质控"));
+    plotCurve1D->xAxis->setLabel(QStringLiteral("频率 Frequency (Hz)"));
+    plotCurve1D->yAxis->setLabel(QStringLiteral("相速度 Phase Velocity (m/s)"));
+
+    // 2. 清空并预分配 3 个专属图层 (各司其职，互不干扰)
+    plotCurve1D->clearGraphs();
+
+    // 图层 1: 理论基阶曲线 (红实线)
+    graphTheoretical = plotCurve1D->addGraph();
+    graphTheoretical->setPen(QPen(Qt::red, 2.0));
+    graphTheoretical->setName(QStringLiteral("理论基阶曲线 (Theoretical)"));
+
+    // 图层 2: 实测拾取曲线 (深蓝线带红白圆点标记)
+    graphPicked = plotCurve1D->addGraph();
+    graphPicked->setPen(QPen(QColor(2, 132, 199), 1.8));
+    graphPicked->setScatterStyle(QCPScatterStyle(QCPScatterStyle::ssCircle, Qt::red, Qt::white, 6));
+    graphPicked->setName(QStringLiteral("实测拾取点 (Observed/Picked)"));
+
+    // 图层 3: 反演拟合曲线 (黑色加粗虚线)
+    graphInverted = plotCurve1D->addGraph();
+    graphInverted->setPen(QPen(Qt::black, 2.2, Qt::DashLine));
+    graphInverted->setName(QStringLiteral("反演拟合曲线 (Inverted Fit)"));
+
+    curveMainLayout->addWidget(plotCurve1D, 1);
+
+    // 3. 底部曲线独立显隐控制栏 (Bottom Control Bar)
+    QFrame* curveBottomBar = new QFrame(curveCompareContainer);
+    curveBottomBar->setFixedHeight(42);
+    curveBottomBar->setStyleSheet("QFrame { background-color: #0f172a; border-top: 1px solid #334155; }");
+    QHBoxLayout* barLayout2 = new QHBoxLayout(curveBottomBar);
+    barLayout2->setContentsMargins(15, 0, 15, 0);
+    barLayout2->setSpacing(16);
+
+    QLabel* lblCtrlTitle = new QLabel(QStringLiteral("曲线显隐:"), curveBottomBar);
+    lblCtrlTitle->setStyleSheet("color: #cbd5e1; font-weight: bold; border: none;");
+
+    chkShowTheoretical = new QCheckBox(QStringLiteral("理论基阶线 (红)"), curveBottomBar);
+    chkShowTheoretical->setChecked(true);
+    chkShowTheoretical->setStyleSheet("color: #f87171; font-weight: bold;"); // 柔和红
+
+    chkShowPicked = new QCheckBox(QStringLiteral("实测拾取点 (蓝/点)"), curveBottomBar);
+    chkShowPicked->setChecked(true);
+    chkShowPicked->setStyleSheet("color: #38bdf8; font-weight: bold;"); // 天蓝
+
+    chkShowInverted = new QCheckBox(QStringLiteral("反演拟合线 (黑虚)"), curveBottomBar);
+    chkShowInverted->setChecked(true);
+    chkShowInverted->setStyleSheet("color: #cbd5e1; font-weight: bold;");
+
+    lblCurveMisfit = new QLabel(QStringLiteral("拟合残差 RMSE: 待计算"), curveBottomBar);
+    lblCurveMisfit->setStyleSheet("color: #10b981; font-family: Consolas; font-size: 12px; border: none;");
+
+    barLayout2->addWidget(lblCtrlTitle);
+    barLayout2->addWidget(chkShowTheoretical);
+    barLayout2->addWidget(chkShowPicked);
+    barLayout2->addWidget(chkShowInverted);
+    barLayout2->addStretch();
+    barLayout2->addWidget(lblCurveMisfit);
+
+    curveMainLayout->addWidget(curveBottomBar, 0);
+
+    // 4. 绑定复选框与图层显隐联动
+    connect(chkShowTheoretical, &QCheckBox::toggled, this, [=](bool on) {
+        if (graphTheoretical) graphTheoretical->setVisible(on);
+        plotCurve1D->replot();
+        });
+    connect(chkShowPicked, &QCheckBox::toggled, this, [=](bool on) {
+        if (graphPicked) graphPicked->setVisible(on);
+        plotCurve1D->replot();
+        });
+    connect(chkShowInverted, &QCheckBox::toggled, this, [=](bool on) {
+        if (graphInverted) graphInverted->setVisible(on);
+        plotCurve1D->replot();
+        });
 
     // ---------------------------------------------------------
     // --- 页面 4: 1D 速度结构剖面展示 (Tab 4: Vs Profile) ---
@@ -592,37 +674,61 @@ void Pro_Seis_MASW::initMainTabs()
     invMainLayout->addWidget(contentWidget, 1);
 
     // 2. 底部控制栏
+    // 找到 initMainTabs() 中配置 invBottomBar 的代码：
     QFrame* invBottomBar = new QFrame(inversionContainer);
     invBottomBar->setFixedHeight(42);
     invBottomBar->setStyleSheet("QFrame { background-color: #0f172a; border-top: 1px solid #334155; }");
     QHBoxLayout* invBarLayout = new QHBoxLayout(invBottomBar);
     invBarLayout->setContentsMargins(15, 0, 15, 0);
-    invBarLayout->setSpacing(12);
+    invBarLayout->setSpacing(10);
 
+    lblVsSummary = new QLabel(QStringLiteral("暂未载入反演地层模型"), invBottomBar);
+    lblVsSummary->setStyleSheet("color: #38bdf8; font-family: Consolas; font-size: 12px;");
+
+    // =========================================================
+    // 【新增】：直接在底栏选择反演分层方案
+    // =========================================================
+    QLabel* lblInvLayers = new QLabel(QStringLiteral("反演分层:"), invBottomBar);
+    lblInvLayers->setStyleSheet("color: #cbd5e1; font-weight: bold; border: none;");
+
+    comboInvLayers = new QComboBox(invBottomBar);
+    comboInvLayers->setFixedWidth(200);
+    comboInvLayers->setStyleSheet(
+        "QComboBox { background-color: #1e293b; border: 1px solid #334155; color: #f8fafc; border-radius: 4px; padding: 3px 8px; }"
+        "QComboBox QAbstractItemView { background-color: #1e293b; color: #f8fafc; selection-background-color: #0284c7; }"
+    );
+    comboInvLayers->addItem(QStringLiteral("两层模型 (单层覆盖+基底)"), 2);
+    comboInvLayers->addItem(QStringLiteral("三层模型 (浅覆+过渡+基底)"), 3);
+    comboInvLayers->addItem(QStringLiteral("四层模型 (浅层 0~16m)"), 4);
+    comboInvLayers->addItem(QStringLiteral("六层模型 (0~30m 实测推荐)"), 6);
+    comboInvLayers->addItem(QStringLiteral("八层模型 (0~45m 高密深部)"), 8);
+    comboInvLayers->setCurrentIndex(0); // 默认选两层 (或实测时选6层)
+
+    // 原有的反演按钮与载入按钮
     btnRunInversion = new QPushButton(QStringLiteral("🚀 开始 1D 速度反演"), invBottomBar);
     btnRunInversion->setStyleSheet(
         "QPushButton {"
         "   background-color: #059669; color: white; font-weight: bold;"
-        "   padding: 5px 16px; border-radius: 4px; min-height: 26px;"
+        "   padding: 5px 14px; border-radius: 4px; min-height: 26px;"
         "}"
         "QPushButton:hover { background-color: #047857; }"
         "QPushButton:pressed { background-color: #065f46; }"
     );
     connect(btnRunInversion, &QPushButton::clicked, this, &Pro_Seis_MASW::onRunInversionClicked);
 
-    lblVsSummary = new QLabel(QStringLiteral("暂未载入反演地层模型"), invBottomBar);
-    lblVsSummary->setStyleSheet("color: #38bdf8; font-family: Consolas; font-size: 12px;");
-
-    btnLoadVsModel = new QPushButton(QStringLiteral("📂 载入反演模型文件 (*.txt)"), invBottomBar);
+    btnLoadVsModel = new QPushButton(QStringLiteral("📂 载入模型 (*.txt)"), invBottomBar);
     btnLoadVsModel->setStyleSheet(
-        "QPushButton { background-color: #0284c7; color: white; font-weight: bold; padding: 5px 14px; border-radius: 4px; }"
+        "QPushButton { background-color: #0284c7; color: white; font-weight: bold; padding: 5px 12px; border-radius: 4px; }"
         "QPushButton:hover { background-color: #0369a1; }"
     );
     connect(btnLoadVsModel, &QPushButton::clicked, this, &Pro_Seis_MASW::onLoadInversionModel);
 
+    // 装配底栏：标签 -> 弹簧 -> 分层选择 -> 开始反演 -> 载入模型
     invBarLayout->addWidget(lblVsSummary);
     invBarLayout->addStretch();
-    invBarLayout->addWidget(btnRunInversion); // <--- 新增原生反演按钮
+    invBarLayout->addWidget(lblInvLayers);
+    invBarLayout->addWidget(comboInvLayers);      // <--- 紧挨着反演按钮
+    invBarLayout->addWidget(btnRunInversion);
     invBarLayout->addWidget(btnLoadVsModel);
 
     invMainLayout->addWidget(invBottomBar, 0);
@@ -630,8 +736,8 @@ void Pro_Seis_MASW::initMainTabs()
     // 将四个标签页统一加入主窗口
     mainTabWidget->addTab(seismicViewContainer, QStringLiteral("1. 原始道集 (Shot Gather)"));
     mainTabWidget->addTab(dispersionContainer, QStringLiteral("2. 频散能量谱 (Dispersion Map)"));
-    mainTabWidget->addTab(plotCurve1D, QStringLiteral("3. 频散曲线 (Extracted Curves)"));
-    mainTabWidget->addTab(inversionContainer, QStringLiteral("4. 速度结构 (Vs Profile)")); // <--- 新增 Tab 4
+    mainTabWidget->addTab(curveCompareContainer, QStringLiteral("3. 频散曲线 (Extracted Curves)")); // <--- 替换为容器
+    mainTabWidget->addTab(inversionContainer, QStringLiteral("4. 速度结构 (Vs Profile)"));
 }
 
 void Pro_Seis_MASW::initControlDock()
@@ -864,22 +970,22 @@ void Pro_Seis_MASW::initControlDock()
 
             if (idx == 1) {
                 // 标准三层递增型 (土 -> 砾石 -> 基岩)
-                spinLayerH1->setValue(5.0);   spinLayerVs1->setValue(200.0);
-                spinLayerH2->setValue(8.0);   spinLayerVs2->setValue(380.0);
+                spinLayerH1->setValue(10.0);   spinLayerVs1->setValue(200.0);
+                spinLayerH2->setValue(10.0);   spinLayerVs2->setValue(380.0);
                 spinLayerVs3->setValue(750.0);
                 spinWaveletFm->setValue(15.0);
             }
             else if (idx == 2) {
                 // 低速夹层型 (硬壳层 -> 软弱层 -> 基底)
-                spinLayerH1->setValue(4.0);   spinLayerVs1->setValue(350.0);
-                spinLayerH2->setValue(6.0);   spinLayerVs2->setValue(160.0);
+                spinLayerH1->setValue(10.0);   spinLayerVs1->setValue(350.0);
+                spinLayerH2->setValue(10.0);   spinLayerVs2->setValue(160.0);
                 spinLayerVs3->setValue(600.0);
                 spinWaveletFm->setValue(12.0);
             }
             else if (idx == 3) {
                 // 浅基岩型 (薄层覆盖 -> 坚硬基岩)
-                spinLayerH1->setValue(3.0);   spinLayerVs1->setValue(160.0);
-                spinLayerH2->setValue(5.0);   spinLayerVs2->setValue(450.0);
+                spinLayerH1->setValue(10.0);   spinLayerVs1->setValue(160.0);
+                spinLayerH2->setValue(10.0);   spinLayerVs2->setValue(450.0);
                 spinLayerVs3->setValue(1200.0);
                 spinWaveletFm->setValue(18.0);
             }
@@ -1004,8 +1110,8 @@ void Pro_Seis_MASW::initControlDock()
     // =========================================================================
     // 装配 Tab 页面到 DockWidget
     // =========================================================================
-    dockTabs->addTab(pageDispersion, QStringLiteral("📊 频散分析"));
     dockTabs->addTab(pageSynthetic, QStringLiteral("🧪 理论正演"));
+    dockTabs->addTab(pageDispersion, QStringLiteral("📊 频散分析"));
     dockTabs->addTab(pageDatasetGen, QStringLiteral("📦 样本生成")); // <--- 新增 Tab 3
 
     controlDock->setWidget(dockTabs);
@@ -1046,9 +1152,6 @@ void Pro_Seis_MASW::initLogDock()
 // =========================================================
 // 读取 SEGY 并嵌入显示
 // =========================================================
-// ---------------------------------------------------------
-// 核心：统一的 SEGY 解析与载入函数 (拖拽和按钮共用)
-// ---------------------------------------------------------
 void Pro_Seis_MASW::loadSegyFile(const QString& filePath)
 {
     if (filePath.isEmpty() || !QFile::exists(filePath)) return;
@@ -1078,6 +1181,8 @@ void Pro_Seis_MASW::loadSegyFile(const QString& filePath)
     updateDataBadges(QFileInfo(filePath).fileName(), traces, samples, dt * 1000.0f);
     statusChipData->setText(QString("<font color='#10b981'>●</font> <b>数据</b>: %1道×%2点").arg(traces).arg(samples));
 
+    
+
     // 2. 调用 SeismicView2D 模块生成视图组件并嵌入 Tab 1
     QWidget* seismicPlotWidget = createSeismicView(m_seismicData, QStringLiteral("道集剖面"), seismicViewContainer, dt);
 
@@ -1092,6 +1197,9 @@ void Pro_Seis_MASW::loadSegyFile(const QString& filePath)
 
     // 自动切到第 1 页
     mainTabWidget->setCurrentIndex(0);
+    // 【核心新增】：标记当前为外部实测数据
+    m_dataSourceType = SourceExternal;
+    if (comboInvLayers) comboInvLayers->setCurrentIndex(3); // 默认选第4项: 六层模型
 }
 
 // ---------------------------------------------------------
@@ -1384,26 +1492,12 @@ void Pro_Seis_MASW::updatePickVisuals()
     plotDispersion->replot();
 
     // --- 2. 实时同步到 Tab 3 (Plot1D 期刊级展示) ---
-    if (plotCurve1D) {
-        if (!std_f.empty()) {
-            plotCurve1D->setData(std_f, std_v, QStringLiteral("拾取的基阶频散曲线 (Fundamental Mode)"));
-            plotCurve1D->xAxis->setLabel(QStringLiteral("频率 Frequency (Hz)"));
-            plotCurve1D->yAxis->setLabel(QStringLiteral("相速度 Phase Velocity (m/s)"));
-
-            // 特殊保护：当刚拾取第 1 个点时，手动撑开视野范围，防止范围为 0 导致崩溃
-            if (std_f.size() == 1) {
-                plotCurve1D->xAxis->setRange(std_f[0] - 5.0, std_f[0] + 5.0);
-                plotCurve1D->yAxis->setRange(std_v[0] - 50.0, std_v[0] + 50.0);
-                plotCurve1D->replot();
-            }
+    if (graphPicked) {
+        graphPicked->setData(qf, qv);
+        if (!qf.isEmpty()) {
+            chkShowPicked->setChecked(true);
         }
-        else {
-            // 【核心修复】：千万不要调用 clearGraphs()！只需清空数据即可保持指针有效！
-            if (plotCurve1D->graphCount() > 0) {
-                plotCurve1D->graph(0)->data()->clear();
-                plotCurve1D->replot();
-            }
-        }
+        updateCurveComparisonView();
     }
 
     // 状态栏提示
@@ -1582,6 +1676,14 @@ void Pro_Seis_MASW::onSyntheticClicked()
         modelTypeStr = QString("三层模型: H=[%1,%2]m, Vs=[%3,%4,%5]m/s").arg(h1).arg(h2).arg(vs1).arg(vs2).arg(vs3);
     }
 
+    // 【核心新增】：根据第2层是否启用来标记正演数据类型
+    if (!spinLayerH2->isEnabled()) {
+        m_dataSourceType = SourceSynthetic2L; // 理论两层
+    }
+    else {
+        m_dataSourceType = SourceSynthetic3L; // 理论三层
+    }
+
     // 2. 读取几何与频率范围
     double dt = spinDt->value() / 1000.0;
     double dx = spinDx->value();
@@ -1618,13 +1720,25 @@ void Pro_Seis_MASW::onSyntheticClicked()
     mainTabWidget->setCurrentIndex(0);
 
     // 6. 将理论曲线更新至 Tab 3 (Plot1D)
-    if (plotCurve1D) {
-        plotCurve1D->setData(freqs, theoVel, QStringLiteral("理论基阶频散曲线 (Theoretical)"));
-        plotCurve1D->graph(0)->setPen(QPen(Qt::red, 2.0));
+    if (graphTheoretical) {
+        QVector<double> qf(freqs.begin(), freqs.end());
+        QVector<double> qv(theoVel.begin(), theoVel.end());
+        graphTheoretical->setData(qf, qv);
+        chkShowTheoretical->setChecked(true);
+        updateCurveComparisonView();
     }
 
     textLog->append(QStringLiteral("[%1] 理论面波合成完成，成果已载入 Tab 1 和 Tab 3。")
         .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+
+    if (comboInvLayers) {
+        if (!spinLayerH2->isEnabled()) {
+            comboInvLayers->setCurrentIndex(0); // 选两层
+        }
+        else {
+            comboInvLayers->setCurrentIndex(1); // 选三层
+        }
+    }
 }
 
 void Pro_Seis_MASW::onStartDatasetGeneration()
@@ -1904,6 +2018,20 @@ void Pro_Seis_MASW::onAiPickClicked()
     }
 }
 
+void Pro_Seis_MASW::updateCurveComparisonView()
+{
+    if (!plotCurve1D) return;
+
+    plotCurve1D->rescaleAxes();
+    double ySpan = plotCurve1D->yAxis->range().size();
+    if (ySpan > 1e-4) {
+        // 上下留 8% 呼吸感边距，避免点顶住边框
+        plotCurve1D->yAxis->setRange(plotCurve1D->yAxis->range().lower - ySpan * 0.05,
+            plotCurve1D->yAxis->range().upper + ySpan * 0.08);
+    }
+    plotCurve1D->replot();
+}
+
 void Pro_Seis_MASW::onLoadInversionModel()
 {
     QString defaultPath = QCoreApplication::applicationDirPath() + "/../../Pro_Seis_MASW/pro_data/output_curve/Inverted_Vs_Model.txt";
@@ -1951,12 +2079,52 @@ void Pro_Seis_MASW::onRunInversionClicked()
     timer.start(); 
 
     // 3. 配置反演参数 (与 Python 端保持一致)
+    // =========================================================
+    // 【核心升级】：根据数据来源与地质预设，自适应构建反演模型
+    // =========================================================
+    // =========================================================
+    // 【核心实现】：根据用户在底栏下拉框选定的分层方案配置反演模型
+    // =========================================================
     InversionParams params;
-    params.layerH = { 2.0, 3.0, 5.0, 8.0, 12.0 }; // 6层模型 (前5层厚度，第6层为半空间)
     params.vsMin = 100.0;
     params.vsMax = 1500.0;
-    params.lambdaReg = 0.02; // Tikhonov 平滑正则化系数
-    params.maxIter = 25;
+    params.maxIter = 30;
+
+    int layerMode = comboInvLayers->currentData().toInt(); // 获取层数 (2, 3, 4, 6, 8)
+    QString modeDesc = comboInvLayers->currentText();
+
+    if (layerMode == 2) {
+        // --- 两层模型: 取 H1 作为第1层厚度，第2层为无限深半空间 ---
+        double h1 = (spinLayerH1 && spinLayerH1->value() > 0.0) ? spinLayerH1->value() : 10.0;
+        params.layerH = { h1 };
+        params.lambdaReg = 0.001; // 两层突变模型，采用极弱平滑，保证界面陡峭
+    }
+    else if (layerMode == 3) {
+        // --- 三层模型: 取 H1, H2 作为前两层厚度 ---
+        double h1 = (spinLayerH1 && spinLayerH1->value() > 0.0) ? spinLayerH1->value() : 5.0;
+        double h2 = (spinLayerH2 && spinLayerH2->value() > 0.0) ? spinLayerH2->value() : 10.0;
+        params.layerH = { h1, h2 };
+        params.lambdaReg = 0.005;
+    }
+    else if (layerMode == 4) {
+        // --- 四层模型: 浅层工程 0~16m ---
+        params.layerH = { 3.0, 5.0, 8.0 };
+        params.lambdaReg = 0.015;
+    }
+    else if (layerMode == 8) {
+        // --- 八层模型: 深部高密 0~44m ---
+        params.layerH = { 1.5, 2.5, 4.0, 6.0, 8.0, 10.0, 12.0 };
+        params.lambdaReg = 0.05;
+    }
+    else {
+        // --- 六层模型 (默认推荐): 经典 0~30m 勘察剖面 ---
+        params.layerH = { 2.0, 3.0, 5.0, 8.0, 12.0 };
+        params.lambdaReg = 0.03;
+    }
+
+    textLog->append(QStringLiteral("[%1] 🚀 启动 1D 速度反演 | 用户选定方案: 【%2】")
+        .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
+        .arg(modeDesc));
 
     // 4. 执行纯 C++ 原生非线性反演
     InversionResult res = RayleighInversionSolver::runInversion(freqs, obsVel, params);
@@ -1995,17 +2163,16 @@ void Pro_Seis_MASW::onRunInversionClicked()
     displayInversionModel(outPath);
 
     // 7. 同步将反演拟合的理论黑线回传至 Tab 3，实现拟合度可视化质检
-    if (plotCurve1D) {
-        // 在 Tab 3 上增加或更新反演拟合曲线
-        if (plotCurve1D->graphCount() < 2) {
-            plotCurve1D->addGraph();
-        }
+    if (graphInverted) {
         QVector<double> qf(res.freqs.begin(), res.freqs.end());
         QVector<double> qv(res.calcVel.begin(), res.calcVel.end());
-        plotCurve1D->graph(1)->setData(qf, qv);
-        plotCurve1D->graph(1)->setPen(QPen(Qt::black, 2.0, Qt::DashLine));
-        plotCurve1D->graph(1)->setName(QStringLiteral("反演拟合曲线 (RMSE=%1 m/s)").arg(res.rmse, 0, 'f', 2));
-        plotCurve1D->replot();
+        graphInverted->setData(qf, qv);
+        graphInverted->setName(QStringLiteral("反演拟合曲线 (RMSE=%1 m/s)").arg(res.rmse, 0, 'f', 2));
+        chkShowInverted->setChecked(true);
+
+        // 刷新底栏 RMSE 残差看板
+        lblCurveMisfit->setText(QString("拟合残差 RMSE: <font color='#10b981'><b>%1 m/s</b></font>").arg(res.rmse, 0, 'f', 2));
+        updateCurveComparisonView();
     }
 
     // 8. 界面与日志提示
@@ -2191,22 +2358,239 @@ void Pro_Seis_MASW::onResetAll()
 // ---------------------------------------------------------
 void Pro_Seis_MASW::onShowHelp()
 {
-    QMessageBox::about(this, QStringLiteral("SeisTool-MASW 系统指南"),
-        QStringLiteral("<h3>SeisTool-MASW 面波频散分析系统 v1.0</h3>"
-            "<p>本系统用于近地表工程面波（MASW）高精度频散分析、理论正演与反演。</p>"
-            "<b>核心工作流：</b>"
-            "<ol>"
-            "<li><b>Tab 1 原始道集</b>：拖拽或打开 SEGY 数据，Wiggle 与灰度剖面实时渲染；</li>"
-            "<li><b>Tab 2 频散能量谱</b>：支持移相法、F-K法、高分辨率 MVDR、倾斜叠加法，点击【AI 智能拾取】一键成线；</li>"
-            "<li><b>Tab 3 频散曲线</b>：期刊级曲线对比，支持导出反演所需 ASCII 数据；</li>"
-            "<li><b>Tab 4 速度结构</b>：1D 横波速度 (Vs) 阶梯剖面展示与地层分层表格。</li>"
-            "</ol>"
-            "<b>操作小贴士：</b>"
-            "<ul>"
-            "<li>支持直接从桌面拖拽 .sgy 文件至窗口快速载入；</li>"
-            "<li>频散谱右键支持重置、切换清晰色块 / 平滑插值，以及导出 SEGY；</li>"
-            "<li>快捷键：<b>Ctrl+O</b> 打开数据 | <b>Ctrl+R</b> 开始计算。</li>"
-            "</ul>"));
+    // =========================================================
+    // 1. 创建独立帮助手册窗口 (QDialog)
+    // =========================================================
+    QDialog* helpDialog = new QDialog(this);
+    helpDialog->setAttribute(Qt::WA_DeleteOnClose);
+    helpDialog->setWindowTitle(QStringLiteral("SeisTool-MASW 用户手册与理论指南 v1.0"));
+    helpDialog->resize(920, 680);
+    helpDialog->setMinimumSize(780, 500);
+
+    QVBoxLayout* mainLayout = new QVBoxLayout(helpDialog);
+    mainLayout->setContentsMargins(12, 12, 12, 12);
+    mainLayout->setSpacing(10);
+
+    // 2. 核心分页容器 (QTabWidget)
+    QTabWidget* helpTabs = new QTabWidget(helpDialog);
+    helpTabs->setStyleSheet(
+        "QTabWidget::pane { border: 1px solid #334155; background-color: #0b1120; border-radius: 6px; }"
+        "QTabBar::tab { background: #1e293b; color: #94a3b8; padding: 8px 18px; margin-right: 2px; border-top-left-radius: 4px; border-top-right-radius: 4px; font-weight: bold; font-size: 12px; }"
+        "QTabBar::tab:selected { background: #0284c7; color: #ffffff; }"
+        "QTabBar::tab:hover:!selected { background: #334155; color: #e2e8f0; }"
+    );
+
+    // HTML 基础样式模板
+    QString htmlHead =
+        "<style>"
+        "body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; font-size: 13px; color: #cbd5e1; line-height: 1.6; background-color: #0b1120; padding: 10px; }"
+        "h2 { color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 5px; font-size: 17px; margin-top: 5px; }"
+        "h3 { color: #7dd3fc; font-size: 14px; margin-top: 14px; margin-bottom: 4px; }"
+        "b, strong { color: #f8fafc; }"
+        "code { background-color: #1e293b; color: #38bdf8; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 12px; }"
+        "pre { background-color: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 8px; color: #e2e8f0; font-family: 'Consolas', monospace; font-size: 12px; }"
+        "table { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 12px; }"
+        "th { background-color: #1e293b; color: #38bdf8; font-weight: bold; padding: 6px 10px; border: 1px solid #334155; text-align: left; }"
+        "td { padding: 6px 10px; border: 1px solid #334155; color: #cbd5e1; }"
+        "tr:nth-child(even) { background-color: #0f172a; }"
+        ".tip-box { background-color: #0f172a; border-left: 4px solid #0284c7; padding: 8px 12px; margin: 10px 0; border-radius: 2px; }"
+        ".warn-box { background-color: #0f172a; border-left: 4px solid #f59e0b; padding: 8px 12px; margin: 10px 0; border-radius: 2px; }"
+        "ul, ol { margin-top: 4px; margin-bottom: 8px; padding-left: 22px; }"
+        "li { margin-bottom: 4px; }"
+        "</style>";
+
+    // =========================================================================
+    // 【Tab 1: 概述与系统工作流】
+    // =========================================================================
+    QTextBrowser* tb1 = new QTextBrowser(helpTabs);
+    tb1->setOpenExternalLinks(true);
+    tb1->setHtml(htmlHead + QStringLiteral(
+        "<h2>一、 系统概述 (System Overview)</h2>"
+        "<p><b>SeisTool-MASW</b> 是一款专为近地表工程物探勘察研发的专业级多道面波分析系统（MASW，Multichannel Analysis of Surface Waves）。系统突破了传统软件各环节割裂的弊端，实现了从原始波形到速度反演的完整闭环。</p>"
+        "<div class='tip-box'>"
+        "<b>适用应用场景：</b>"
+        "<ul>"
+        "<li><b>浅层岩土勘察</b>：基岩埋深探测、地层分层与断层破碎带定位；</li>"
+        "<li><b>城市隐患排查</b>：道路/堤坝内部空洞、脱空区及溶洞病害排查；</li>"
+        "<li><b>工程抗震评价</b>：建筑抗震场地类别划分（V<sub>s30</sub> 等效剪切波速计算）；</li>"
+        "<li><b>科研与教学</b>：面波高阶模态识别、理论频散特征分析及数值验证。</li>"
+        "</ul>"
+        "</div>"
+        "<h2>二、 四大主窗口工作流程 (4-Stage Pipeline)</h2>"
+        "<p>系统主界面严格遵循地球物理勘察标准生命周期构建：</p>"
+        "<ol>"
+        "<li><b>Tab 1 原始道集 (Shot Gather)</b>：<br>"
+        "负责外场实测 SEG-Y 数据解码、质量检验（QC）、坏道识别及理论合成炮集预览。支持波形起伏线（Wiggle）与变密度热力图双层叠加显示，内置 LOD 视口优化。</li>"
+        "<li><b>Tab 2 频散能量谱 (Dispersion Map)</b>：<br>"
+        "系统的核心计算与交互区。支持将时空波场变换为相速度-频率能量谱，提供四大成像算子，支持 Snap-to-Peak 自动寻峰吸附及 AI 一键智能拾取。</li>"
+        "<li><b>Tab 3 频散曲线 (Extracted Curves)</b>：<br>"
+        "期刊级 1D 频散曲线对比展示区（Plot1D）。将实测提取的相速度离散点与理论计算红线叠合比对，支持导出工业标准反演 ASCII 文本。</li>"
+        "<li><b>Tab 4 速度结构 (Vs Profile)</b>：<br>"
+        "地质最终成果交付区。呈现向下递增的垂直阶梯速度剖面（Step Profile）与分层物理参数表，支持原生 C++ Levenberg-Marquardt 阻尼非线性反演。</li>"
+        "</ol>"
+    ));
+    helpTabs->addTab(tb1, QStringLiteral("📖 概述与工作流"));
+
+    // =========================================================================
+    // 【Tab 2: 四大频散算法与拾取指南】
+    // =========================================================================
+    QTextBrowser* tb2 = new QTextBrowser(helpTabs);
+    tb2->setHtml(htmlHead + QStringLiteral(
+        "<h2>一、 四大频散能量谱成像算子对比</h2>"
+        "<table>"
+        "<tr><th>算法名称</th><th>数学特征</th><th>主要优势</th><th>适用场景与局限</th></tr>"
+        "<tr>"
+        "<td><b>移相法 (Phase Shift)</b><br>Park et al., 1998</td>"
+        "<td>逐道傅里叶振幅纯相位归一化，空间复数相移干涉叠加：<br><code>E = |Σ P(x,f)·e^(i·2πf·x/v)| / N</code></td>"
+        "<td>高低频能量极其均衡；抗几何扩散与地层吸收衰减能力最强，对非等间距排列宽容度高。</td>"
+        "<td><b>常规工程生产主力算子</b>（推荐默认使用）；能量条带宽度中等。</td>"
+        "</tr>"
+        "<tr>"
+        "<td><b>Capon 高分辨率 (MVDR)</b><br>Capon, 1969</td>"
+        "<td>双向空间平滑满秩协方差求逆，自适应抑制旁瓣干扰：<br><code>E = 1 / (a^H · R^(-1) · a)</code></td>"
+        "<td><b>能量脊线极度纤细</b>，条带宽度约为移相法的 1/3；基阶与高阶分界极其分明。</td>"
+        "<td>适合精细分层与复杂场地；单炮记录必须依赖子阵列空间平滑保证满秩。</td>"
+        "</tr>"
+        "<tr>"
+        "<td><b>倾斜叠加法 (τ-p 变换)</b><br>McMechan & Yedlin, 1981</td>"
+        "<td>时空域线性动校正（LMO）截距时间叠加，沿 τ 做 1D-FFT：<br><code>u(τ,p) = Σ u(x, τ+p·x), p=1/v</code></td>"
+        "<td>最纯粹的物理走时干涉叠加；直观反映波场真实能量密度。</td>"
+        "<td>未做振幅均衡，受近道强能量主导，低频与高频端衰减较快。</td>"
+        "</tr>"
+        "<tr>"
+        "<td><b>F-K 变换法 (2D-FFT)</b><br>Yilmaz, 1987</td>"
+        "<td>时空二维双重傅里叶变换映射至 (f, k)，再利用 <code>v = 2πf/k</code> 映射到相速度轴。</td>"
+        "<td>计算速度最快，纯矩阵变换。</td>"
+        "<td>受空间检波器孔径截断影响较大；在低波数区速度离散度非线性拉伸。</td>"
+        "</tr>"
+        "</table>"
+
+        "<h2>二、 频散曲线拾取机制</h2>"
+        "<h3>1. 交互点选 + 局部极大值自动吸附 (Snap-to-Peak)</h3>"
+        "<ul>"
+        "<li><b>操作方法</b>：在 Tab 2 底栏勾选 <code>[√] 拾取模式</code>，鼠标在红黄色能量脊线附近单机左键即可；</li>"
+        "<li><b>算法原理</b>：算法以点击位置为中心，在垂直速度方向（±15 个网格）自适应搜索物理能量最大值点（Peak），自动吸附到位，<b>彻底消除人工手抖误差</b>；</li>"
+        "<li><b>编辑技巧</b>：点错时点击 <code>【撤销点】</code>；同一频点重复点击会自动覆盖旧点；快捷键 <code>【清空曲线】</code> 可重新开始。</li>"
+        "</ul>"
+        "<h3>2. 🤖 ONNX Runtime AI 一键智能拾取</h3>"
+        "<ul>"
+        "<li>系统内置专用多尺度空洞残差卷积网络（<code>DispersionRidgeNet</code>），仅 7.9 万参数；</li>"
+        "<li>点击 <code>【🤖 AI 一键拾取】</code>，后台调用本地 ONNX 引擎进行毫秒级端到端骨架分割，直接生成光滑连续的基阶相速度曲线。</li>"
+        "</ul>"
+
+        "<h2>三、 谱图显示模式控制</h2>"
+        "<ul>"
+        "<li><b>双模式归一化</b>：底栏支持 <code>按频率归一化 (推荐)</code>（每列最大值=1.0，整条曲线清晰高亮）与 <code>全局归一化</code>（保留激发能量在主频的聚集特征）毫秒级切换；</li>"
+        "<li><b>平滑度切换</b>：右键菜单可勾选 <code>平滑插值 (Smooth Blur)</code> 开启双线性平滑云雾图，或取消勾选呈现 MATLAB 风格的清晰离散网格色块。</li>"
+        "</ul>"
+    ));
+    helpTabs->addTab(tb2, QStringLiteral("⚡ 频散算法与拾取"));
+
+    // =========================================================
+    // 【Tab 3: 理论正演与 1D 速度反演】
+    // =========================================================
+    QTextBrowser* tb3 = new QTextBrowser(helpTabs);
+    tb3->setHtml(htmlHead + QStringLiteral(
+        "<h2>一、 层状介质理论频散正演模拟 (Forward Modeling)</h2>"
+        "<p>系统在控制面板提供了强大的数值仿真引擎，支持双层及三层地质模型面波记录合成：</p>"
+        "<ul>"
+        "<li><b>Schwab-Knopoff 传递矩阵求根算法</b>：<br>"
+        "建立多层弹性半空间自由应力边界与位移连续性超越特征方程 <code>F(c, ω) = 0</code>，采用双曲正切消指数增长技术 <code>tanh(k·r·d)</code>，从高频表层渐近线（c ≈ 0.92 Vs<sub>1</sub>）逆序追踪求根，<b>彻底根治高频溢出</b>；</li>"
+        "<li><b>物理频散波场合成机制</b>：<br>"
+        "提取雷克子波振幅谱 A(f)，引入理论相速度相移因子 <code>exp(-i·2πf·x / c(f))</code>，经逆傅里叶变换（IFFT）生成具有真实频散延迟的多道炮集。</li>"
+        "</ul>"
+
+        "<h2>二、 1D 横波速度结构反演 (Vs Inversion)</h2>"
+        "<div class='tip-box'>"
+        "<b>地学目标：</b>从实测提取的相速度频散曲线 (f, v<sub>R</sub>)，反演求解地下各层的真实厚度 H 与横波速度 V<sub>s</sub> 分层结构。"
+        "</div>"
+        "<h3>1. 目标泛函与正则化模型</h3>"
+        "<p>反演系统求解以下带 Tikhonov 一阶平滑粗糙度约束的非线性最小二乘目标方程：</p>"
+        "<pre>Φ(m) = 1/2 · ||v_obs - v_calc(m)||^2 + 1/2 · λ · ||L · m||^2</pre>"
+        "<ul>"
+        "<li><b>数据残差项</b>：保证理论计算值与实测拾取点紧密吻合；</li>"
+        "<li><b>正则化项 ||L·m||²</b>：一阶差分算子，约束相邻层速度突变，<b>防止反演解出现剧烈非物理震荡（锯齿化）</b>；</li>"
+        "<li><b>平滑因子 λ (默认 0.02)</b>：数据质量高/界线分明时可调小（如 0.005）；噪声大时调大（如 0.05）。</li>"
+        "</ul>"
+
+        "<h3>2. 求解引擎 (C++ Levenberg-Marquardt)</h3>"
+        "<ul>"
+        "<li>系统采用 Eigen 密集矩阵库，通过数值微小扰动显式计算雅可比敏感度矩阵 J，建立正规方程：<br>"
+        "<code>(J^T·J + λ·L^T·L + μ·I) · Δm = J^T·(v_obs - v_calc) - λ·L^T·L·m</code></li>"
+        "<li>单步限制更新步长不超过 15%，施加 [100, 1500] m/s 物理有界约束，收敛耗时仅需 <b>20 ~ 50 毫秒</b>；</li>"
+        "<li>反演完成后，在 Tab 4 自动生成标准垂直阶梯图（采用 QCPCurve 绘制，绝对无错位折线）并填满分层表格。</li>"
+        "</ul>"
+    ));
+    helpTabs->addTab(tb3, QStringLiteral("🧪 正演模拟与反演"));
+
+    // =========================================================
+    // 【Tab 4: 快捷键、参数规范与 FAQ】
+    // =========================================================
+    QTextBrowser* tb4 = new QTextBrowser(helpTabs);
+    tb4->setHtml(htmlHead + QStringLiteral(
+        "<h2>一、 常用快捷键与鼠标交互 (Hotkeys & Mouse)</h2>"
+        "<table>"
+        "<tr><th>操作 / 快捷键</th><th>所在区域</th><th>功能描述</th></tr>"
+        "<tr><td><b>Ctrl + O</b></td><td>全局</td><td>弹出标准文件对话框打开 SEGY 数据</td></tr>"
+        "<tr><td><b>直接文件拖拽</b></td><td>主窗口任意位置</td><td>将桌面 .sgy / .segy 文件拖入窗口秒级载入</td></tr>"
+        "<tr><td><b>鼠标滚轮</b></td><td>所有图表区</td><td>以鼠标指针为中心进行视野无级缩放</td></tr>"
+        "<tr><td><b>鼠标左键拖拽</b></td><td>所有图表区</td><td>平移坐标系视野（拾取模式开启时自动保护锁定）</td></tr>"
+        "<tr><td><b>Shift + 左键拖拽</b></td><td>Tab 3 / Tab 4</td><td>框选局部曲线数据（用于时频分析与局域导出）</td></tr>"
+        "<tr><td><b>鼠标右键单击</b></td><td>Tab 1 / Tab 2</td><td>弹出快捷菜单（重置视图、切换样式、导出图像/SEGY）</td></tr>"
+        "</table>"
+
+        "<h2>二、 常见地学参数设置经验准则 (Best Practices)</h2>"
+        "<ul>"
+        "<li><b>采样间隔 (dt)</b>：必须与原始文件绝对相符（通常为 0.5ms、1.0ms 或 2.0ms），dt 错误会导致频率轴等比缩放失真；</li>"
+        "<li><b>道间距 (dx)</b>：决定了空间假频上限（空间奈奎斯特极限：λ_min = 2·dx）。若 dx=1m，最高有效分析波长为 2m；</li>"
+        "<li><b>最大反演深度准则 (半波长法则)</b>：<br>"
+        "面波最大探测深度通常约为最大波长的一半：<code>Z_max ≈ λ_max / 2 = v_R(f_min) / (2 · f_min)</code>。<br>"
+        "例如最长相速度为 400 m/s，分析下限为 5 Hz，则探测深度极限约为 <code>400 / (2×5) = 40 米</code>。据此设定分层总深度最为科学。</li>"
+        "</ul>"
+
+        "<h2>三、 常见故障排查 (Troubleshooting FAQ)</h2>"
+        "<div class='warn-box'>"
+        "<b>Q1：为什么导入数据后计算出的频散谱全是蓝色背景，看不到红带？</b><br>"
+        "<b>A</b>：请检查观测参数中的 <code>采样间隔 (dt)</code> 是否设置正确；检查速度扫描区间 <code>[Vmin, Vmax]</code> 是否包含了真实相速度；在 Tab 2 底栏确认是否选择了 <code>按频率归一化 (每列)</code>。"
+        "</div>"
+        "<div class='warn-box'>"
+        "<b>Q2：为什么拖入 SEGY 文件时出现鼠标禁止图标 (🚫)？</b><br>"
+        "<b>A</b>：由于 Windows 的 UIPI 安全隔离机制，如果 Visual Studio 是“以管理员身份运行”启动的，系统会禁止普通资源管理器向其拖入文件。请直接双击运行编译出的 .exe 文件测试拖拽。"
+        "</div>"
+        "<div class='warn-box'>"
+        "<b>Q3：反演时提示拟合误差较大（RMSE 偏高）如何改善？</b><br>"
+        "<b>A</b>：① 检查拾取曲线中是否混入了高阶模态或异常抖动坏点；② 在反演参数中根据半波长法则合理调整地层总深度；③ 适当调整平滑正则化系数 λ（噪声大时调大至 0.05）。"
+        "</div>"
+    ));
+    helpTabs->addTab(tb4, QStringLiteral("⌨️ 快捷键与 FAQ"));
+
+    mainLayout->addWidget(helpTabs, 1);
+
+    // =========================================================
+    // 3. 底部对话框控制按钮
+    // =========================================================
+    QHBoxLayout* bottomLayout = new QHBoxLayout;
+    bottomLayout->setContentsMargins(4, 4, 4, 4);
+
+    QLabel* lblCopy = new QLabel(QStringLiteral("SeisTool-MASW © 2026 | 基于 Qt5/6, Eigen3, QCustomPlot & ONNX Runtime 构建"), helpDialog);
+    lblCopy->setStyleSheet("color: #64748b; font-size: 11px; border: none;");
+
+    QPushButton* btnClose = new QPushButton(QStringLiteral("关闭手册 (Close)"), helpDialog);
+    btnClose->setFixedWidth(120);
+    btnClose->setStyleSheet(
+        "QPushButton { background-color: #0284c7; color: white; font-weight: bold; border-radius: 4px; padding: 6px 14px; }"
+        "QPushButton:hover { background-color: #0369a1; }"
+    );
+    connect(btnClose, &QPushButton::clicked, helpDialog, &QDialog::accept);
+
+    bottomLayout->addWidget(lblCopy);
+    bottomLayout->addStretch();
+    bottomLayout->addWidget(btnClose);
+
+    mainLayout->addLayout(bottomLayout);
+
+    // 弹出非模态或模态窗口
+    helpDialog->exec();
 }
 
 void Pro_Seis_MASW::initStatusBar()
