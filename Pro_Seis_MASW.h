@@ -106,6 +106,7 @@ private:
 
     // 辅助方法：多曲线自适应缩放重绘
     void updateCurveComparisonView();
+    void update2DVsSection();
 
 private slots:
     // --- 核心业务槽函数 ---
@@ -229,7 +230,26 @@ private:
     // =====================================================
     QWidget* inversionContainer = nullptr; // Tab 4 总容器
     Data_show::Plot1D* plotVsProfile = nullptr; // 1D 阶梯剖面图表
-    QTableWidget* tableVsModel = nullptr; // 地层参数表格
+    QTableWidget* tableVsModel = nullptr;
+
+    struct VsModelLayer {
+        double topDepth = 0.0;
+        double thickness = 0.0;
+        double vs = 0.0;
+    };
+    QVector<VsModelLayer> m_vsModelLayers;
+
+    QWidget* section2DContainer = nullptr;
+    QCustomPlot* plotVsSection = nullptr;
+    QCPColorMap* vsSectionColorMap = nullptr;
+    QCPColorScale* vsSectionColorScale = nullptr;
+    QDoubleSpinBox* spinSectionLength = nullptr;
+    QDoubleSpinBox* spinSectionVariation = nullptr;
+    QSpinBox* spinSectionNx = nullptr;
+    QSpinBox* spinSectionNz = nullptr;
+    QComboBox* comboSectionPalette = nullptr;
+    QPushButton* btnGenerateSection = nullptr;
+    QLabel* lblSectionStatus = nullptr; // 地层参数表格
     QPushButton* btnLoadVsModel = nullptr; // 载入模型文件按钮
     QLabel* lblVsSummary = nullptr; // 底部模型状态摘要
 

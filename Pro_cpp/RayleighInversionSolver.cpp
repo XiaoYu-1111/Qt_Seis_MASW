@@ -2,6 +2,7 @@
 #include <iostream>
 #include <numeric>
 #include <cmath>
+#include <algorithm>
 
 LayerModel RayleighInversionSolver::makeLayerModel(const Eigen::VectorXd& m, const InversionParams& params)
 {
@@ -53,9 +54,26 @@ InversionResult RayleighInversionSolver::runInversion(
 {
     InversionResult result;
     int M = freqs.size();
-    if (M < 3 || obsVel.size() != freqs.size()) {
+    if (M < 3 || obsVel.size() != freqs.size() || params.layerH.empty() ||
+        !std::isfinite(params.vsMin) || !std::isfinite(params.vsMax) ||
+        params.vsMin <= 0.0 || params.vsMax < params.vsMin ||
+        !std::isfinite(params.lambdaReg) || params.lambdaReg < 0.0 || params.maxIter <= 0) {
         result.success = false;
         return result;
+    }
+
+    for (int i = 0; i < M; ++i) {
+        if (!std::isfinite(freqs[i]) || freqs[i] <= 0.0 ||
+            !std::isfinite(obsVel[i]) || obsVel[i] <= 0.0) {
+            result.success = false;
+            return result;
+        }
+    }
+    for (double thickness : params.layerH) {
+        if (!std::isfinite(thickness) || thickness <= 0.0) {
+            result.success = false;
+            return result;
+        }
     }
 
     result.freqs = freqs;
@@ -80,12 +98,17 @@ InversionResult RayleighInversionSolver::runInversion(
     // 瑞雷波速 ≈ 0.92 Vs，因此基底 Vs 绝对不能低于 vMax / 0.92
     // =========================================================
     double basementMinVs = std::max(params.vsMin, (vMax / 0.90));
+    if (basementMinVs > params.vsMax) {
+        result.success = false;
+        return result;
+    }
 
     Eigen::VectorXd m(N);
     for (int i = 0; i < N; ++i) {
         double ratio = (N > 1) ? (double)i / (N - 1) : 0.0;
         double initVal = (vMin * 1.05) + ratio * (basementMinVs * 1.05 - vMin * 1.05);
-        m(i) = initVal;
+        double lower = (i == N - 1) ? basementMinVs : params.vsMin;
+        m(i) = std::clamp(initVal, lower, params.vsMax);
     }
 
     std::vector<double> calcVel;
@@ -112,8 +135,7 @@ InversionResult RayleighInversionSolver::runInversion(
 
         // B. 自适应平滑项匹配
         Eigen::MatrixXd JtJ = J.transpose() * J;
-        double scaleFactor = JtJ.trace() / std::max(1.0, LtL.trace());
-        double lambdaEff = 0.05 * scaleFactor; // 加大平滑权重，压制层间无序倒转
+        double lambdaEff = params.lambdaReg; // Match the regularization term used in computeObjective.
 
         Eigen::MatrixXd H = JtJ + lambdaEff * LtL + mu * Eigen::MatrixXd::Identity(N, N);
 
@@ -134,13 +156,11 @@ InversionResult RayleighInversionSolver::runInversion(
 
         // D. 施加物理有界保护
         for (int i = 0; i < N; ++i) {
-            double lower = (i == N - 1) ? basementMinVs : params.vsMin; // 基底必须 >= basementMinVs
-            m_trial(i) = std::clamp(m_trial(i), lower, params.vsMax);
-
-            // 弱单调约束：深部层速度尽量不低于上一层，防止严重倒转诱发漏失波
-            if (i > 0 && m_trial(i) < m_trial(i - 1) * 0.90) {
-                m_trial(i) = m_trial(i - 1) * 0.90;
+            double lower = (i == N - 1) ? basementMinVs : params.vsMin;
+            if (i > 0) {
+                lower = std::max(lower, m_trial(i - 1) * 0.90);
             }
+            m_trial(i) = std::clamp(m_trial(i), lower, params.vsMax);
         }
 
         std::vector<double> trialCalcVel;

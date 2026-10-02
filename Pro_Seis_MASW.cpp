@@ -2,6 +2,14 @@
 #include "ui_Pro_Seis_MASW.h"
 #include "qcustomplot.h"
 #include "style.h"
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <QGridLayout>
+#include <QSpinBox>
+#include <QSettings>
+#include <QMenu>
+#include <QRegularExpression>
 
 // 辅助函数：根据名称生成 QCustomPlot 色标渐变
 static QCPColorGradient getScientificGradient(const QString& type, bool invert = false)
@@ -71,6 +79,84 @@ static QCPColorGradient getScientificGradient(const QString& type, bool invert =
     return grad;
 }
 
+static void applyApplicationTheme(QWidget* root, int themeIndex)
+{
+    using StyleHelper::ThemeMode;
+    themeIndex = qBound(0, themeIndex, 9);
+    root->setProperty("_currentThemeIndex", themeIndex);
+    const ThemeMode mode = static_cast<ThemeMode>(themeIndex);
+    const auto colors = StyleHelper::themeColors(mode);
+    root->setStyleSheet(StyleHelper::getThemeStyle(mode));
+
+    QPalette palette;
+    palette.setColor(QPalette::Window, QColor(colors.bgApp));
+    palette.setColor(QPalette::WindowText, QColor(colors.text));
+    palette.setColor(QPalette::Base, QColor(colors.bgCard));
+    palette.setColor(QPalette::AlternateBase, QColor(colors.bgHover));
+    palette.setColor(QPalette::Text, QColor(colors.text));
+    palette.setColor(QPalette::Button, QColor(colors.bgHeader));
+    palette.setColor(QPalette::ButtonText, QColor(colors.text));
+    palette.setColor(QPalette::Highlight, QColor(colors.primary));
+    palette.setColor(QPalette::HighlightedText, QColor(colors.buttonText));
+    QApplication::setPalette(palette);
+
+    // Translate legacy per-widget dark QSS so existing controls follow the selected theme too.
+    const QList<QWidget*> widgets = root->findChildren<QWidget*>();
+    for (QWidget* widget : widgets) {
+        if (!widget->property("_themeBaseStyleSaved").toBool()) {
+            widget->setProperty("_themeBaseStyle", widget->styleSheet());
+            widget->setProperty("_themeBaseStyleSaved", true);
+        }
+        QString qss = widget->property("_themeBaseStyle").toString();
+        const QList<QPair<QString, QString>> replacements = {
+            {"#0f172a", colors.bgApp}, {"#0b1120", colors.bgApp}, {"#0b1220", colors.bgApp},
+            {"#111827", colors.bgHeader}, {"#1e293b", colors.bgCard}, {"#172554", colors.bgHover},
+            {"#334155", colors.bgHeader}, {"#475569", colors.border}, {"#64748b", colors.textMuted},
+            {"#94a3b8", colors.textSecondary}, {"#cbd5e1", colors.text}, {"#e2e8f0", colors.text},
+            {"#f1f5f9", colors.text}, {"#f8fafc", colors.text}, {"#0284c7", colors.primary},
+            {"#0369a1", colors.primary}, {"#38bdf8", colors.primary}
+        };
+        for (const auto& replacement : replacements)
+            qss.replace(replacement.first, replacement.second, Qt::CaseInsensitive);
+        widget->setStyleSheet(qss);
+    }
+
+    const QColor foreground(colors.text);
+    const QColor background(colors.bgCard);
+    const QColor grid("#cbd5df");
+    for (QCustomPlot* plot : root->findChildren<QCustomPlot*>()) {
+        plot->setBackground(QColor(colors.bgApp));
+        plot->axisRect()->setBackground(background);
+        const QList<QCPAxis*> axes = { plot->xAxis, plot->yAxis, plot->xAxis2, plot->yAxis2 };
+        for (QCPAxis* axis : axes) {
+            axis->setBasePen(QPen(foreground, 1));
+            axis->setTickPen(QPen(foreground, 1));
+            axis->setSubTickPen(QPen(foreground, 1));
+            axis->setTickLabelColor(foreground);
+            axis->setLabelColor(foreground);
+            axis->grid()->setPen(QPen(grid, 1, Qt::DotLine));
+        }
+        if (auto* title = qobject_cast<QCPTextElement*>(plot->plotLayout()->element(0, 0)))
+            title->setTextColor(foreground);
+        plot->replot(QCustomPlot::rpQueuedReplot);
+    }
+    QSettings settings;
+    settings.setValue(QStringLiteral("Appearance/theme.v2"), themeIndex);
+}
+
+static void showThemeMenu(QWidget* parent, const QPoint& globalPos, int currentTheme, const std::function<void(int)>& onSelected)
+{
+    QMenu menu(parent);
+    const QStringList names = { QStringLiteral("清爽米绿"), QStringLiteral("优雅薰衣草"), QStringLiteral("冰川静蓝"), QStringLiteral("夏日草甸"), QStringLiteral("经典白色 (MATLAB)"), QStringLiteral("深邃蓝灰"), QStringLiteral("海盐薄荷"), QStringLiteral("樱雾玫瑰"), QStringLiteral("暖阳砂岩"), QStringLiteral("暮色靛蓝") };
+    for (int i = 0; i < names.size(); ++i) {
+        QAction* action = menu.addAction(names[i]);
+        action->setCheckable(true);
+        action->setChecked(i == currentTheme);
+        QObject::connect(action, &QAction::triggered, parent, [onSelected, i]() { onSelected(i); });
+    }
+    menu.exec(globalPos);
+}
+
 Pro_Seis_MASW::Pro_Seis_MASW(QWidget* parent)
     : QMainWindow(parent), ui(new Ui::Pro_Seis_MASWClass)
 {
@@ -78,7 +164,6 @@ Pro_Seis_MASW::Pro_Seis_MASW(QWidget* parent)
 
     this->setWindowTitle(QStringLiteral("SeisTool-MASW 面波频散分析系统 v1.0"));
     this->setMinimumSize(1100,680);
-    this->setStyleSheet(StyleHelper::getDarkScientificStyle());
     this->setAcceptDrops(true);
     setWindowIcon(QIcon(":/Pro_Seis_WASW/icon/layer.png"));
     resize(1366,800);
@@ -89,6 +174,9 @@ Pro_Seis_MASW::Pro_Seis_MASW(QWidget* parent)
     initLogDock();
 
     initStatusBar(); // <--- 调用状态栏初始化
+
+    const int savedTheme = QSettings().value(QStringLiteral("Appearance/theme.v2"), 4).toInt();
+    applyApplicationTheme(this, savedTheme);
 
     // 默认触发一次初始状态
     statusChipMethod->setText(QStringLiteral("<font color='#38bdf8'>●</font> <b>算法</b>: 移相法"));
@@ -178,6 +266,17 @@ void Pro_Seis_MASW::createActionsAndToolBars()
     ui->mainToolBar->addWidget(lblBadgeTraces);
     ui->mainToolBar->addWidget(lblBadgeDt);
     ui->mainToolBar->addWidget(lblBadgeTime);
+
+    QPushButton* btnTheme = new QPushButton(QStringLiteral("🎨"), this);
+    btnTheme->setCursor(Qt::PointingHandCursor);
+    btnTheme->setFixedSize(34, 30);
+    btnTheme->setToolTip(QStringLiteral("界面风格：切换应用主题"));
+    ui->mainToolBar->addWidget(btnTheme);
+    connect(btnTheme, &QPushButton::clicked, this, [this, btnTheme]() {
+        const int current = property("_currentThemeIndex").toInt();
+        showThemeMenu(this, btnTheme->mapToGlobal(QPoint(0, btnTheme->height())), current,
+            [this](int selected) { applyApplicationTheme(this, selected); });
+    });
 
     // 初始化为未载入状态
     updateDataBadges(QStringLiteral("未载入数据"), 0, 0, 0.0f);
@@ -369,11 +468,15 @@ void Pro_Seis_MASW::initMainTabs()
 
     // 2. 初始化底部控制栏 (Bottom Bar)
     QFrame* dispBottomBar = new QFrame(dispersionContainer);
-    dispBottomBar->setFixedHeight(45);
+    dispBottomBar->setMinimumHeight(78);
     dispBottomBar->setStyleSheet("QFrame { background-color: #0f172a; border-top: 1px solid #334155; }");
-    QHBoxLayout* barLayout = new QHBoxLayout(dispBottomBar);
-    barLayout->setContentsMargins(15, 0, 15, 0);
-    barLayout->setSpacing(12);
+    QVBoxLayout* bottomBarLayout = new QVBoxLayout(dispBottomBar);
+    bottomBarLayout->setContentsMargins(12, 5, 12, 5);
+    bottomBarLayout->setSpacing(3);
+    QHBoxLayout* displayControlsLayout = new QHBoxLayout();
+    displayControlsLayout->setSpacing(7);
+    QHBoxLayout* pickingControlsLayout = new QHBoxLayout();
+    pickingControlsLayout->setSpacing(7);
 
     // 状态显示（鼠标当前坐标和能量值）
     lblDispStatus = new QLabel(QStringLiteral("就绪 (Ready)"), dispBottomBar);
@@ -384,34 +487,37 @@ void Pro_Seis_MASW::initMainTabs()
     lblNorm->setStyleSheet("color: #cbd5e1; font-weight: bold; border: none;");
 
     comboNormMode = new QComboBox(dispBottomBar);
-    comboNormMode->setFixedWidth(150);
-    comboNormMode->addItem(QStringLiteral("按频率归一化 (每列)")); // 索引 0: 默认推荐
-    comboNormMode->addItem(QStringLiteral("全局归一化"));           // 索引 1
+    comboNormMode->setMinimumWidth(78);
+    comboNormMode->setMaximumWidth(125);
+    comboNormMode->addItem(QStringLiteral("逐频率")); // 索引 0: 默认推荐
+    comboNormMode->addItem(QStringLiteral("全局"));   // 索引 1
     comboNormMode->setCurrentIndex(1);
+    comboNormMode->setToolTip(QStringLiteral("逐频率归一化：逐频率列归一化；全局：保留不同频率间的能量差异。"));
 
     // 绑定信号：切换模式时瞬间重绘，无需重新计算算法！
     connect(comboNormMode, QOverload<int>::of(&QComboBox::currentIndexChanged),
         this, &Pro_Seis_MASW::renderDispersionMap);
     // 色标切换控件
-    QLabel* lblCmap = new QLabel(QStringLiteral("色标 (Colormap):"), dispBottomBar);
+    QLabel* lblCmap = new QLabel(QStringLiteral("色带:"), dispBottomBar);
     lblCmap->setStyleSheet("color: #cbd5e1; font-weight: bold; border: none;");
 
     comboDispCmap = new QComboBox(dispBottomBar);
-    comboDispCmap->setFixedWidth(110);
+    comboDispCmap->setMinimumWidth(70);
+    comboDispCmap->setMaximumWidth(105);
     comboDispCmap->addItems({ "Jet", "Turbo", "Viridis", "Plasma", "Inferno", "Hot", "Seismic", "Grayscale" });
 
-    chkDispInv = new QCheckBox(QStringLiteral("反转 (Inv)"), dispBottomBar);
+    chkDispInv = new QCheckBox(QStringLiteral("反转"), dispBottomBar);
     chkDispInv->setStyleSheet("color: #cbd5e1;");
 
-    barLayout->addWidget(lblDispStatus);
-    barLayout->addStretch();
-    barLayout->addWidget(lblNorm);          // <--- 新增归一化标签
-    barLayout->addWidget(comboNormMode);     // <--- 新增归一化选择框
-    barLayout->addWidget(lblCmap);
-    barLayout->addWidget(comboDispCmap);
-    barLayout->addWidget(chkDispInv);
-
-    dispMainLayout->addWidget(dispBottomBar, 0); // 权重 0，固定在底部
+    lblDispStatus->setMinimumWidth(120);
+    lblDispStatus->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    displayControlsLayout->addWidget(lblDispStatus, 1);
+    displayControlsLayout->addWidget(lblNorm);
+    displayControlsLayout->addWidget(comboNormMode);
+    displayControlsLayout->addWidget(lblCmap);
+    displayControlsLayout->addWidget(comboDispCmap);
+    displayControlsLayout->addWidget(chkDispInv);
+    bottomBarLayout->addLayout(displayControlsLayout);
 
     // 3. 信号绑定
     connect(comboDispCmap, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &Pro_Seis_MASW::updateDispersionColormap);
@@ -442,10 +548,6 @@ void Pro_Seis_MASW::initMainTabs()
     // 在 initMainTabs() 中，找到 dispBottomBar 的布局部分，追加以下代码：
 
     // 1. 拾取控制组件
-    QFrame* vline = new QFrame(dispBottomBar);
-    vline->setFrameShape(QFrame::VLine);
-    vline->setStyleSheet("color: #475569;");
-
     chkPickMode = new QCheckBox(QStringLiteral("拾取模式"), dispBottomBar);
     chkPickMode->setStyleSheet("color: #38bdf8; font-weight: bold;");
 
@@ -461,28 +563,20 @@ void Pro_Seis_MASW::initMainTabs()
     // 找到 initMainTabs() 中配置 dispBottomBar 拾取按钮的地方，追加：
 
     btnAiPick = new QPushButton(QStringLiteral("🤖 AI 一键拾取"), dispBottomBar);
-    btnAiPick->setStyleSheet(
-        "QPushButton {"
-        "   background-color: #7c3aed;"       // 亮紫色，突出 AI 科技感
-        "   border: 1px solid #6d28d9;"
-        "   color: white;"
-        "   font-weight: bold;"
-        "   border-radius: 4px;"
-        "   padding: 4px 10px;"
-        "   min-height: 26px;"
-        "}"
-        "QPushButton:hover { background-color: #6d28d9; }"
-        "QPushButton:pressed { background-color: #5b21b6; }"
-    );
+    btnAiPick->setObjectName(QStringLiteral("btnPrimary"));
+    btnAiPick->setMinimumHeight(26);
     connect(btnAiPick, &QPushButton::clicked, this, &Pro_Seis_MASW::onAiPickClicked);
 
     // 将 AI 按钮放在“拾取模式”复选框的旁边
-    barLayout->addWidget(vline);
-    barLayout->addWidget(chkPickMode);
-    barLayout->addWidget(btnAiPick);          // <--- 插入 AI 拾取按钮
-    barLayout->addWidget(btnUndoPick);
-    barLayout->addWidget(btnClearPick);
-    barLayout->addWidget(btnExportCurve);
+    pickingControlsLayout->addWidget(chkPickMode);
+    pickingControlsLayout->addWidget(btnAiPick);
+    pickingControlsLayout->addWidget(btnUndoPick);
+    pickingControlsLayout->addWidget(btnClearPick);
+    pickingControlsLayout->addWidget(btnExportCurve);
+    pickingControlsLayout->addStretch();
+    bottomBarLayout->addLayout(pickingControlsLayout);
+
+    dispMainLayout->addWidget(dispBottomBar, 0);
 
     // 2. 拾取模式切换信号 (开启拾取时，暂停鼠标滚轮平移以防拖拽干扰)
     connect(chkPickMode, &QCheckBox::toggled, this, [=](bool checked) {
@@ -676,14 +770,16 @@ void Pro_Seis_MASW::initMainTabs()
     // 2. 底部控制栏
     // 找到 initMainTabs() 中配置 invBottomBar 的代码：
     QFrame* invBottomBar = new QFrame(inversionContainer);
-    invBottomBar->setFixedHeight(42);
+    invBottomBar->setMinimumHeight(52);
     invBottomBar->setStyleSheet("QFrame { background-color: #0f172a; border-top: 1px solid #334155; }");
     QHBoxLayout* invBarLayout = new QHBoxLayout(invBottomBar);
-    invBarLayout->setContentsMargins(15, 0, 15, 0);
-    invBarLayout->setSpacing(10);
+    invBarLayout->setContentsMargins(12, 6, 12, 6);
+    invBarLayout->setSpacing(8);
 
     lblVsSummary = new QLabel(QStringLiteral("暂未载入反演地层模型"), invBottomBar);
-    lblVsSummary->setStyleSheet("color: #38bdf8; font-family: Consolas; font-size: 12px;");
+    lblVsSummary->setStyleSheet("color: #38bdf8; font-family: Consolas; font-size: 12px; border: none;");
+    lblVsSummary->setMinimumWidth(210);
+    lblVsSummary->setToolTip(QStringLiteral("反演模型层数、有效深度与半空间横波速度"));
 
     // =========================================================
     // 【新增】：直接在底栏选择反演分层方案
@@ -693,6 +789,8 @@ void Pro_Seis_MASW::initMainTabs()
 
     comboInvLayers = new QComboBox(invBottomBar);
     comboInvLayers->setFixedWidth(200);
+    comboInvLayers->setMinimumHeight(30);
+    comboInvLayers->setToolTip(QStringLiteral("选择反演模型的层数和预设层厚。合成数据会根据正演模型自动选择两层或三层。"));
     comboInvLayers->setStyleSheet(
         "QComboBox { background-color: #1e293b; border: 1px solid #334155; color: #f8fafc; border-radius: 4px; padding: 3px 8px; }"
         "QComboBox QAbstractItemView { background-color: #1e293b; color: #f8fafc; selection-background-color: #0284c7; }"
@@ -706,6 +804,8 @@ void Pro_Seis_MASW::initMainTabs()
 
     // 原有的反演按钮与载入按钮
     btnRunInversion = new QPushButton(QStringLiteral("🚀 开始 1D 速度反演"), invBottomBar);
+    btnRunInversion->setMinimumHeight(32);
+    btnRunInversion->setToolTip(QStringLiteral("使用 Tab 2 中已拾取的频散曲线反演 Vs 剖面；至少需要 4 个有效频点。"));
     btnRunInversion->setStyleSheet(
         "QPushButton {"
         "   background-color: #059669; color: white; font-weight: bold;"
@@ -717,6 +817,8 @@ void Pro_Seis_MASW::initMainTabs()
     connect(btnRunInversion, &QPushButton::clicked, this, &Pro_Seis_MASW::onRunInversionClicked);
 
     btnLoadVsModel = new QPushButton(QStringLiteral("📂 载入模型 (*.txt)"), invBottomBar);
+    btnLoadVsModel->setMinimumHeight(32);
+    btnLoadVsModel->setToolTip(QStringLiteral("从文本文件载入已有的分层 Vs 模型"));
     btnLoadVsModel->setStyleSheet(
         "QPushButton { background-color: #0284c7; color: white; font-weight: bold; padding: 5px 12px; border-radius: 4px; }"
         "QPushButton:hover { background-color: #0369a1; }"
@@ -733,11 +835,140 @@ void Pro_Seis_MASW::initMainTabs()
 
     invMainLayout->addWidget(invBottomBar, 0);
 
-    // 将四个标签页统一加入主窗口
+    // ---------------------------------------------------------
+    // --- 页面 5：由 1D Vs 模型生成的二维演示剖面 ---
+    // ---------------------------------------------------------
+    section2DContainer = new QWidget(this);
+    section2DContainer->setObjectName(QStringLiteral("section2DContainer"));
+    QVBoxLayout* sectionMainLayout = new QVBoxLayout(section2DContainer);
+    sectionMainLayout->setContentsMargins(8, 8, 8, 8);
+    sectionMainLayout->setSpacing(8);
+
+    QLabel* sectionInfo = new QLabel(
+        QStringLiteral("二维初始模型：将当前 1D Vs 分层结果沿测线方向扩展，并可加入平滑横向扰动。此页面用于界面与流程验证，不代表二维反演结果。"),
+        section2DContainer);
+    sectionInfo->setObjectName(QStringLiteral("sectionInfo"));
+    sectionInfo->setWordWrap(true);
+    sectionMainLayout->addWidget(sectionInfo);
+
+    QFrame* sectionControlBar = new QFrame(section2DContainer);
+    sectionControlBar->setStyleSheet("QFrame { background-color: transparent; border: none; }");
+    QHBoxLayout* sectionControlLayout = new QHBoxLayout(sectionControlBar);
+    sectionControlLayout->setContentsMargins(0, 0, 0, 0);
+    sectionControlLayout->setSpacing(10);
+
+    auto makeSectionGroup = [sectionControlBar](const QString& title) {
+        QGroupBox* group = new QGroupBox(title, sectionControlBar);
+        return group;
+    };
+    auto addSectionField = [](QHBoxLayout* layout, const QString& labelText, QWidget* field) {
+        QLabel* label = new QLabel(labelText);
+        label->setStyleSheet(QStringLiteral("background: transparent; border: none; font-weight: 600;"));
+        layout->addWidget(label);
+        layout->addWidget(field);
+    };
+
+    QGroupBox* geometryGroup = makeSectionGroup(QStringLiteral("测线与网格"));
+    QHBoxLayout* geometryLayout = new QHBoxLayout(geometryGroup);
+    geometryLayout->setContentsMargins(4, 4, 4, 2);
+    geometryLayout->setSpacing(8);
+
+    spinSectionLength = new QDoubleSpinBox(geometryGroup);
+    spinSectionLength->setRange(10.0, 5000.0);
+    spinSectionLength->setValue(100.0);
+    spinSectionLength->setDecimals(0);
+    spinSectionLength->setSuffix(QStringLiteral(" m"));
+    spinSectionLength->setFixedWidth(98);
+    addSectionField(geometryLayout, QStringLiteral("长度"), spinSectionLength);
+
+    spinSectionNx = new QSpinBox(geometryGroup);
+    spinSectionNx->setRange(21, 501);
+    spinSectionNx->setSingleStep(20);
+    spinSectionNx->setValue(121);
+    spinSectionNx->setFixedWidth(68);
+    addSectionField(geometryLayout, QStringLiteral("横向"), spinSectionNx);
+
+    spinSectionNz = new QSpinBox(geometryGroup);
+    spinSectionNz->setRange(21, 501);
+    spinSectionNz->setSingleStep(20);
+    spinSectionNz->setValue(121);
+    spinSectionNz->setFixedWidth(68);
+    addSectionField(geometryLayout, QStringLiteral("深度"), spinSectionNz);
+    sectionControlLayout->addWidget(geometryGroup);
+
+    QGroupBox* displayGroup = makeSectionGroup(QStringLiteral("模拟与显示"));
+    QHBoxLayout* displayLayout = new QHBoxLayout(displayGroup);
+    displayLayout->setContentsMargins(4, 4, 4, 2);
+    displayLayout->setSpacing(8);
+
+    spinSectionVariation = new QDoubleSpinBox(displayGroup);
+    spinSectionVariation->setRange(0.0, 25.0);
+    spinSectionVariation->setValue(8.0);
+    spinSectionVariation->setDecimals(0);
+    spinSectionVariation->setSuffix(QStringLiteral(" %"));
+    spinSectionVariation->setFixedWidth(72);
+    spinSectionVariation->setToolTip(QStringLiteral("0% 为纯 1D 横向外推；增大后加入平滑、连续的合成横向速度变化。"));
+    addSectionField(displayLayout, QStringLiteral("横向变化"), spinSectionVariation);
+
+    comboSectionPalette = new QComboBox(displayGroup);
+    comboSectionPalette->addItems({ QStringLiteral("Turbo"), QStringLiteral("Viridis"), QStringLiteral("Jet"), QStringLiteral("Inferno") });
+    comboSectionPalette->setFixedWidth(92);
+    addSectionField(displayLayout, QStringLiteral("色带"), comboSectionPalette);
+    sectionControlLayout->addWidget(displayGroup);
+
+    btnGenerateSection = new QPushButton(QStringLiteral("生成 / 刷新剖面"), sectionControlBar);
+    btnGenerateSection->setObjectName(QStringLiteral("btnPrimary"));
+    btnGenerateSection->setMinimumHeight(36);
+    btnGenerateSection->setMinimumWidth(112);
+    btnGenerateSection->setEnabled(false);
+    sectionControlLayout->addWidget(btnGenerateSection);
+    sectionControlLayout->addStretch(1);
+    sectionMainLayout->addWidget(sectionControlBar);
+
+    plotVsSection = new QCustomPlot(section2DContainer);
+    plotVsSection->setBackground(Qt::white);
+    plotVsSection->axisRect()->setBackground(Qt::white);
+    plotVsSection->plotLayout()->insertRow(0);
+    QCPTextElement* sectionTitle = new QCPTextElement(plotVsSection,
+        QStringLiteral("二维横波速度剖面 (模拟初始模型)"), QFont("Microsoft YaHei", 12, QFont::Bold));
+    sectionTitle->setTextColor(QColor("#0f172a"));
+    plotVsSection->plotLayout()->addElement(0, 0, sectionTitle);
+    plotVsSection->plotLayout()->insertColumn(1);
+    vsSectionColorScale = new QCPColorScale(plotVsSection);
+    vsSectionColorScale->setType(QCPAxis::atRight);
+    vsSectionColorScale->axis()->setLabel(QStringLiteral("Vs (m/s)"));
+    plotVsSection->plotLayout()->addElement(1, 1, vsSectionColorScale);
+    plotVsSection->xAxis->setLabel(QStringLiteral("沿测线距离 Distance (m)"));
+    plotVsSection->yAxis->setLabel(QStringLiteral("地下深度 Depth (m)"));
+    plotVsSection->yAxis->setRangeReversed(true);
+    const QColor axisColor("#111827");
+    const QPen axisPen(QColor("#111827"), 1.0);
+    for (QCPAxis* axis : { plotVsSection->xAxis, plotVsSection->yAxis,
+                           plotVsSection->xAxis2, plotVsSection->yAxis2,
+                           vsSectionColorScale->axis() }) {
+        axis->setBasePen(axisPen);
+        axis->setTickPen(axisPen);
+        axis->setSubTickPen(axisPen);
+        axis->setTickLabelColor(axisColor);
+        axis->setLabelColor(axisColor);
+        axis->setLabelFont(QFont("Segoe UI", 10, QFont::DemiBold));
+        axis->setTickLabelFont(QFont("Segoe UI", 9));
+        axis->grid()->setPen(QPen(QColor(203, 213, 225, 220), 1, Qt::DotLine));
+    }
+    plotVsSection->setInteractions(QCP::iRangeDrag | QCP::iRangeZoom);
+    sectionMainLayout->addWidget(plotVsSection, 1);
+
+    lblSectionStatus = new QLabel(QStringLiteral("请先在页面 4 完成 1D 反演或载入模型。"), section2DContainer);
+    lblSectionStatus->setStyleSheet(QStringLiteral("background: transparent; padding: 2px 4px; border: none;"));
+    sectionMainLayout->addWidget(lblSectionStatus);
+    connect(btnGenerateSection, &QPushButton::clicked, this, &Pro_Seis_MASW::update2DVsSection);
+
+    // 将五个标签页统一加入主窗口
     mainTabWidget->addTab(seismicViewContainer, QStringLiteral("1. 原始道集 (Shot Gather)"));
     mainTabWidget->addTab(dispersionContainer, QStringLiteral("2. 频散能量谱 (Dispersion Map)"));
     mainTabWidget->addTab(curveCompareContainer, QStringLiteral("3. 频散曲线 (Extracted Curves)")); // <--- 替换为容器
     mainTabWidget->addTab(inversionContainer, QStringLiteral("4. 速度结构 (Vs Profile)"));
+    mainTabWidget->addTab(section2DContainer, QStringLiteral("5. 二维 Vs 剖面 (2D Section)"));
 }
 
 void Pro_Seis_MASW::initControlDock()
@@ -938,14 +1169,8 @@ void Pro_Seis_MASW::initControlDock()
     synthLayout->addWidget(btnQuickCurve);
 
     QPushButton* btnSynthetic = new QPushButton(QStringLiteral("🧪 一键合成理论面波记录"), pageSynthetic);
-    btnSynthetic->setStyleSheet(
-        "QPushButton {"
-        "   background-color: #059669; border: 1px solid #047857; color: white;"
-        "   font-weight: bold; border-radius: 4px; padding: 6px 12px; min-height: 32px;"
-        "}"
-        "QPushButton:hover { background-color: #047857; }"
-        "QPushButton:pressed { background-color: #065f46; }"
-    );
+    btnSynthetic->setObjectName(QStringLiteral("btnPrimary"));
+    btnSynthetic->setMinimumHeight(36);
     connect(btnSynthetic, &QPushButton::clicked, this, &Pro_Seis_MASW::onSyntheticClicked);
     synthLayout->addWidget(btnSynthetic);
 
@@ -1093,14 +1318,8 @@ void Pro_Seis_MASW::initControlDock()
 
     // 4. 启动生成按钮
     btnStartGen = new QPushButton(QStringLiteral("🚀 批量生成训练集 (.bin)"), pageDatasetGen);
-    btnStartGen->setStyleSheet(
-        "QPushButton {"
-        "   background-color: #7c3aed; border: 1px solid #6d28d9; color: white;"
-        "   font-weight: bold; border-radius: 4px; padding: 8px; min-height: 32px;"
-        "}"
-        "QPushButton:hover { background-color: #6d28d9; }"
-        "QPushButton:disabled { background-color: #475569; }"
-    );
+    btnStartGen->setObjectName(QStringLiteral("btnPrimary"));
+    btnStartGen->setMinimumHeight(40);
     connect(btnStartGen, &QPushButton::clicked, this, &Pro_Seis_MASW::onStartDatasetGeneration);
     genLayout->addWidget(btnStartGen);
 
@@ -1194,6 +1413,7 @@ void Pro_Seis_MASW::loadSegyFile(const QString& filePath)
         delete item;
     }
     layout->addWidget(seismicPlotWidget);
+    applyApplicationTheme(this, property("_currentThemeIndex").toInt());
 
     // 自动切到第 1 页
     mainTabWidget->setCurrentIndex(0);
@@ -1714,6 +1934,7 @@ void Pro_Seis_MASW::onSyntheticClicked()
         delete item;
     }
     layout->addWidget(plotWidget);
+    applyApplicationTheme(this, property("_currentThemeIndex").toInt());
     mainTabWidget->setCurrentIndex(0);
 
     // 6. 将理论曲线更新至 Tab 3 (Plot1D)
@@ -2129,7 +2350,8 @@ void Pro_Seis_MASW::onRunInversionClicked()
     QApplication::restoreOverrideCursor();
 
     if (!res.success) {
-        QMessageBox::critical(this, QStringLiteral("反演失败"), QStringLiteral("反演迭代未能收敛，请检查频散曲线数据！"));
+        QMessageBox::critical(this, QStringLiteral("反演失败"),
+            QStringLiteral("输入数据超出当前速度边界，或反演未能收敛。请检查拾取曲线的速度范围和所选模型层数。"));
         return;
     }
 
@@ -2184,7 +2406,7 @@ void Pro_Seis_MASW::onRunInversionClicked()
             "• 迭代次数: %1 次\n"
             "• 运算耗时: %2 ms (毫秒级原生计算)\n"
             "• 拟合误差 RMSE: %3 m/s\n"
-            "• 成果已同步至 Tab 3 (拟合度) 与 Tab 4 (阶梯图/表格)")
+            "• 成果已同步至 Tab 3 (拟合度)、Tab 4 (阶梯图/表格) 与 Tab 5 (二维模拟剖面)")
         .arg(res.iterations).arg(elapsedMs).arg(res.rmse, 0, 'f', 2));
 
     // 自动切到 Tab 4 查看成果
@@ -2225,6 +2447,12 @@ void Pro_Seis_MASW::displayInversionModel(const QString& filePath)
     file.close();
 
     if (layers.isEmpty()) return;
+
+    m_vsModelLayers.clear();
+    m_vsModelLayers.reserve(layers.size());
+    for (const auto& layer : layers) {
+        m_vsModelLayers.append({ layer.depthTop, layer.thk, layer.vs });
+    }
 
     // =========================================================
     // 1. 刷新右侧表格
@@ -2271,6 +2499,10 @@ void Pro_Seis_MASW::displayInversionModel(const QString& filePath)
         curveData.append(QCPCurveData(ptIdx++, l.vs, zTop));
         // 点 2: 底面 (vs, zBottom)
         curveData.append(QCPCurveData(ptIdx++, l.vs, zBottom));
+        // 层间界面按深度水平连接，避免把速度突变画成斜坡。
+        if (i + 1 < layers.size()) {
+            curveData.append(QCPCurveData(ptIdx++, layers[i + 1].vs, zBottom));
+        }
     }
 
     vsStepCurve->data()->set(curveData, true); // true 表示数据已按时间/顺序排好
@@ -2291,7 +2523,124 @@ void Pro_Seis_MASW::displayInversionModel(const QString& filePath)
     lblVsSummary->setText(QStringLiteral("已成功载入: %1 层模型 | 探测最大深度: %2 m | 基底 Vs: %3 m/s")
         .arg(layers.size()).arg(maxDepth, 0, 'f', 1).arg(layers.last().vs, 0, 'f', 1));
 
+    update2DVsSection();
     mainTabWidget->setCurrentWidget(inversionContainer);
+}
+
+void Pro_Seis_MASW::update2DVsSection()
+{
+    if (m_vsModelLayers.isEmpty() || !plotVsSection || !spinSectionLength ||
+        !spinSectionNx || !spinSectionNz || !spinSectionVariation || !comboSectionPalette) {
+        if (lblSectionStatus) {
+            lblSectionStatus->setText(QStringLiteral("请先在页面 4 完成 1D 反演或载入有效模型。"));
+        }
+        return;
+    }
+
+    const int nx = spinSectionNx->value();
+    const int nz = spinSectionNz->value();
+    const double lineLength = spinSectionLength->value();
+    const double variation = spinSectionVariation->value() / 100.0;
+    constexpr double Pi = 3.14159265358979323846;
+
+    double totalFiniteDepth = 0.0;
+    double minLayerThickness = std::numeric_limits<double>::max();
+    for (const auto& layer : m_vsModelLayers) {
+        if (layer.thickness > 0.0) {
+            totalFiniteDepth = std::max(totalFiniteDepth, layer.topDepth + layer.thickness);
+            minLayerThickness = std::min(minLayerThickness, layer.thickness);
+        }
+    }
+    if (totalFiniteDepth <= 0.0) totalFiniteDepth = 20.0;
+    if (minLayerThickness == std::numeric_limits<double>::max()) minLayerThickness = totalFiniteDepth / 4.0;
+
+    const auto& lastLayer = m_vsModelLayers.last();
+    const double maxDepth = lastLayer.thickness > 0.0
+        ? totalFiniteDepth
+        : lastLayer.topDepth + std::max(12.0, totalFiniteDepth * 0.35);
+    const double interfaceRelief = minLayerThickness * 0.18 * (variation / 0.25);
+
+    if (!vsSectionColorMap) {
+        vsSectionColorMap = new QCPColorMap(plotVsSection->xAxis, plotVsSection->yAxis);
+        vsSectionColorMap->setColorScale(vsSectionColorScale);
+        vsSectionColorMap->setInterpolate(true);
+    }
+
+    vsSectionColorMap->data()->setSize(nx, nz);
+    vsSectionColorMap->data()->setRange(QCPRange(0.0, lineLength), QCPRange(0.0, maxDepth));
+
+    QVector<double> interfaceX(nx);
+    for (int ix = 0; ix < nx; ++ix) {
+        interfaceX[ix] = lineLength * ix / (nx - 1.0);
+    }
+
+    double minVs = std::numeric_limits<double>::max();
+    double maxVs = std::numeric_limits<double>::lowest();
+    const double xScale = std::max(1.0, lineLength);
+    const double zScale = std::max(1.0, maxDepth);
+
+    for (int iz = 0; iz < nz; ++iz) {
+        const double depth = maxDepth * iz / (nz - 1.0);
+        for (int ix = 0; ix < nx; ++ix) {
+            const double x = interfaceX[ix];
+            const double xNorm = x / xScale;
+            const double zNorm = depth / zScale;
+            const double interfaceShift = interfaceRelief * std::sin(2.0 * Pi * xNorm);
+            const double modelDepth = std::max(0.0, depth - interfaceShift);
+
+            int layerIndex = 0;
+            for (int i = 0; i + 1 < m_vsModelLayers.size(); ++i) {
+                const auto& layer = m_vsModelLayers[i];
+                if (modelDepth >= layer.topDepth + layer.thickness) {
+                    layerIndex = i + 1;
+                }
+                else {
+                    break;
+                }
+            }
+
+            double structure = 0.55 * std::sin(2.0 * Pi * xNorm + 1.4 * zNorm)
+                + 0.25 * std::cos(4.0 * Pi * xNorm - 2.2 * zNorm);
+            const double anomalyA = std::exp(-((xNorm - 0.28) * (xNorm - 0.28) / 0.018
+                + (zNorm - 0.42) * (zNorm - 0.42) / 0.035));
+            const double anomalyB = std::exp(-((xNorm - 0.72) * (xNorm - 0.72) / 0.022
+                + (zNorm - 0.72) * (zNorm - 0.72) / 0.045));
+            structure = std::clamp(structure + 0.55 * anomalyA - 0.55 * anomalyB, -1.0, 1.0);
+
+            const double vs = std::max(1.0, m_vsModelLayers[layerIndex].vs * (1.0 + variation * structure));
+            vsSectionColorMap->data()->setCell(ix, iz, vs);
+            minVs = std::min(minVs, vs);
+            maxVs = std::max(maxVs, vs);
+        }
+    }
+
+    vsSectionColorMap->setGradient(getScientificGradient(comboSectionPalette->currentText()));
+    vsSectionColorMap->setDataRange(QCPRange(minVs, maxVs > minVs ? maxVs : minVs + 1.0));
+
+    plotVsSection->clearGraphs();
+    for (int boundary = 1; boundary < m_vsModelLayers.size(); ++boundary) {
+        QVector<double> boundaryDepth(nx);
+        const double baseDepth = m_vsModelLayers[boundary].topDepth;
+        for (int ix = 0; ix < nx; ++ix) {
+            const double xNorm = interfaceX[ix] / xScale;
+            boundaryDepth[ix] = baseDepth + interfaceRelief * std::sin(2.0 * Pi * xNorm);
+        }
+        QCPGraph* boundaryGraph = plotVsSection->addGraph();
+        boundaryGraph->setData(interfaceX, boundaryDepth);
+        boundaryGraph->setPen(QPen(QColor(248, 250, 252, 180), 1.2, Qt::DashLine));
+        boundaryGraph->setName(QStringLiteral("模拟层界面"));
+    }
+
+    plotVsSection->xAxis->setRange(0.0, lineLength);
+    plotVsSection->yAxis->setRangeReversed(true);
+    plotVsSection->yAxis->setRange(0.0, maxDepth);
+    plotVsSection->replot();
+
+    btnGenerateSection->setEnabled(true);
+    lblSectionStatus->setText(QStringLiteral("由 %1 层 1D 模型生成 | 网格 %2 × %3 | 横向变化 %4% | Vs 范围 %5–%6 m/s")
+        .arg(m_vsModelLayers.size()).arg(nx).arg(nz)
+        .arg(spinSectionVariation->value(), 0, 'f', 0)
+        .arg(minVs, 0, 'f', 0).arg(maxVs, 0, 'f', 0));
 }
 
 // ---------------------------------------------------------
@@ -2363,6 +2712,12 @@ void Pro_Seis_MASW::onShowHelp()
     helpDialog->setWindowTitle(QStringLiteral("SeisTool-MASW 用户手册与理论指南 v1.0"));
     helpDialog->resize(920, 680);
     helpDialog->setMinimumSize(780, 500);
+    helpDialog->setStyleSheet(
+        "QDialog { background-color: #f4f5f7; color: #222222; }"
+        "QTextBrowser { background-color: #ffffff; color: #222222; border: 1px solid #c8cdd4; }"
+        "QPushButton { background-color: #0072bd; color: #ffffff; border: 1px solid #0063a5; border-radius: 4px; padding: 6px 14px; font-weight: 600; }"
+        "QPushButton:hover { background-color: #005a9c; }"
+    );
 
     QVBoxLayout* mainLayout = new QVBoxLayout(helpDialog);
     mainLayout->setContentsMargins(12, 12, 12, 12);
@@ -2371,27 +2726,27 @@ void Pro_Seis_MASW::onShowHelp()
     // 2. 核心分页容器 (QTabWidget)
     QTabWidget* helpTabs = new QTabWidget(helpDialog);
     helpTabs->setStyleSheet(
-        "QTabWidget::pane { border: 1px solid #334155; background-color: #0b1120; border-radius: 6px; }"
-        "QTabBar::tab { background: #1e293b; color: #94a3b8; padding: 8px 18px; margin-right: 2px; border-top-left-radius: 4px; border-top-right-radius: 4px; font-weight: bold; font-size: 12px; }"
-        "QTabBar::tab:selected { background: #0284c7; color: #ffffff; }"
-        "QTabBar::tab:hover:!selected { background: #334155; color: #e2e8f0; }"
+        "QTabWidget::pane { border: 1px solid #c8cdd4; background-color: #ffffff; border-radius: 4px; }"
+        "QTabBar::tab { background: #e7e9ed; color: #374151; padding: 9px 16px; margin-right: 2px; border: 1px solid #c8cdd4; font-weight: 600; font-size: 12px; }"
+        "QTabBar::tab:selected { background: #ffffff; color: #0072bd; border-bottom: 2px solid #0072bd; }"
+        "QTabBar::tab:hover:!selected { background: #f0f2f5; color: #111827; }"
     );
 
     // HTML 基础样式模板
     QString htmlHead =
         "<style>"
-        "body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; font-size: 13px; color: #cbd5e1; line-height: 1.6; background-color: #0b1120; padding: 10px; }"
-        "h2 { color: #38bdf8; border-bottom: 1px solid #334155; padding-bottom: 5px; font-size: 17px; margin-top: 5px; }"
-        "h3 { color: #7dd3fc; font-size: 14px; margin-top: 14px; margin-bottom: 4px; }"
-        "b, strong { color: #f8fafc; }"
-        "code { background-color: #1e293b; color: #38bdf8; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 12px; }"
-        "pre { background-color: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 8px; color: #e2e8f0; font-family: 'Consolas', monospace; font-size: 12px; }"
+        "body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; font-size: 14px; color: #24292f; line-height: 1.65; background-color: #ffffff; padding: 12px; }"
+        "h2 { color: #005a9c; border-bottom: 1px solid #d0d7de; padding-bottom: 6px; font-size: 18px; margin-top: 8px; }"
+        "h3 { color: #0072bd; font-size: 15px; margin-top: 16px; margin-bottom: 5px; }"
+        "b, strong { color: #111827; }"
+        "code { background-color: #f1f3f5; color: #8a3ffc; padding: 2px 6px; border-radius: 3px; font-family: 'Consolas', monospace; font-size: 13px; }"
+        "pre { background-color: #f6f8fa; border: 1px solid #d0d7de; border-radius: 4px; padding: 9px; color: #24292f; font-family: 'Consolas', monospace; font-size: 13px; }"
         "table { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 12px; }"
-        "th { background-color: #1e293b; color: #38bdf8; font-weight: bold; padding: 6px 10px; border: 1px solid #334155; text-align: left; }"
-        "td { padding: 6px 10px; border: 1px solid #334155; color: #cbd5e1; }"
-        "tr:nth-child(even) { background-color: #0f172a; }"
-        ".tip-box { background-color: #0f172a; border-left: 4px solid #0284c7; padding: 8px 12px; margin: 10px 0; border-radius: 2px; }"
-        ".warn-box { background-color: #0f172a; border-left: 4px solid #f59e0b; padding: 8px 12px; margin: 10px 0; border-radius: 2px; }"
+        "th { background-color: #eaf2f8; color: #1f2937; font-weight: bold; padding: 7px 10px; border: 1px solid #c8cdd4; text-align: left; }"
+        "td { padding: 7px 10px; border: 1px solid #c8cdd4; color: #24292f; }"
+        "tr:nth-child(even) { background-color: #f6f8fa; }"
+        ".tip-box { background-color: #eff6fc; border-left: 4px solid #0072bd; padding: 9px 12px; margin: 10px 0; border-radius: 2px; }"
+        ".warn-box { background-color: #fff7e6; border-left: 4px solid #d99000; padding: 9px 12px; margin: 10px 0; border-radius: 2px; }"
         "ul, ol { margin-top: 4px; margin-bottom: 8px; padding-left: 22px; }"
         "li { margin-bottom: 4px; }"
         "</style>";
@@ -2413,7 +2768,7 @@ void Pro_Seis_MASW::onShowHelp()
         "<li><b>科研与教学</b>：面波高阶模态识别、理论频散特征分析及数值验证。</li>"
         "</ul>"
         "</div>"
-        "<h2>二、 四大主窗口工作流程 (4-Stage Pipeline)</h2>"
+        "<h2>二、 五个主窗口工作流程 (5-Stage Pipeline)</h2>"
         "<p>系统主界面严格遵循地球物理勘察标准生命周期构建：</p>"
         "<ol>"
         "<li><b>Tab 1 原始道集 (Shot Gather)</b>：<br>"
@@ -2424,6 +2779,8 @@ void Pro_Seis_MASW::onShowHelp()
         "期刊级 1D 频散曲线对比展示区（Plot1D）。将实测提取的相速度离散点与理论计算红线叠合比对，支持导出工业标准反演 ASCII 文本。</li>"
         "<li><b>Tab 4 速度结构 (Vs Profile)</b>：<br>"
         "地质最终成果交付区。呈现向下递增的垂直阶梯速度剖面（Step Profile）与分层物理参数表，支持原生 C++ Levenberg-Marquardt 阻尼非线性反演。</li>"
+        "<li><b>Tab 5 二维 Vs 剖面 (2D Section)</b>：<br>"
+        "将当前 1D 模型沿测线方向扩展为二维初始演示模型，可调测线长度、网格密度、色带和横向扰动强度；横向扰动为合成演示，不代表二维反演成果。</li>"
         "</ol>"
     ));
     helpTabs->addTab(tb1, QStringLiteral("📖 概述与工作流"));
@@ -2515,7 +2872,7 @@ void Pro_Seis_MASW::onShowHelp()
         "<li>系统采用 Eigen 密集矩阵库，通过数值微小扰动显式计算雅可比敏感度矩阵 J，建立正规方程：<br>"
         "<code>(J^T·J + λ·L^T·L + μ·I) · Δm = J^T·(v_obs - v_calc) - λ·L^T·L·m</code></li>"
         "<li>单步限制更新步长不超过 15%，施加 [100, 1500] m/s 物理有界约束，收敛耗时仅需 <b>20 ~ 50 毫秒</b>；</li>"
-        "<li>反演完成后，在 Tab 4 自动生成标准垂直阶梯图（采用 QCPCurve 绘制，绝对无错位折线）并填满分层表格。</li>"
+        "<li>反演完成后，Tab 4 更新标准垂直阶梯图与分层参数表，Tab 5 同步生成由 1D 结果扩展的二维演示初始模型。</li>"
         "</ul>"
     ));
     helpTabs->addTab(tb3, QStringLiteral("🧪 正演模拟与反演"));

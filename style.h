@@ -1,7 +1,74 @@
 ﻿#pragma once
 #include <QString>
+#include <QPalette>
 
 namespace StyleHelper {
+    enum class ThemeMode { LightSage, Lavender, NordicBlue, SummerMeadow, ClassicWhite, DeepSlate, Mint, Rose, WarmSand, Twilight };
+
+    struct ThemeColors {
+        QString bgApp, bgCard, bgHover, bgHeader, border, focus;
+        QString text, textSecondary, textMuted, primary, accent, buttonText;
+    };
+
+    inline ThemeColors themeColors(ThemeMode mode) {
+        switch (mode) {
+        case ThemeMode::Lavender: return {"#f5f3f8", "#ffffff", "#faf8fc", "#ece7f2", "#dfd5ea", "#6b3ba7", "#2a183d", "#6e5d80", "#9f90b3", "#6b3ba7", "#9568af", "#ffffff"};
+        case ThemeMode::NordicBlue: return {"#edf4f8", "#ffffff", "#f5f9fc", "#e1edf5", "#cde1ee", "#026896", "#0e2938", "#476b80", "#7f9fb3", "#026896", "#38a3d8", "#ffffff"};
+        case ThemeMode::SummerMeadow: return {"#faf7ee", "#ffffff", "#fdfcf7", "#f3edd8", "#e8dfc5", "#467a57", "#2a241b", "#695f51", "#9e9383", "#467a57", "#f28e00", "#ffffff"};
+        case ThemeMode::ClassicWhite: return {"#f4f5f7", "#ffffff", "#f0f2f5", "#e7e9ed", "#c8cdd4", "#0072bd", "#222222", "#4b5563", "#6b7280", "#0072bd", "#4dbeee", "#ffffff"};
+        case ThemeMode::DeepSlate: return {"#101c2e", "#202d42", "#263852", "#18263b", "#2d3e57", "#6b8fbd", "#edf3fc", "#a8bbd8", "#7489a8", "#4b6b98", "#7294c2", "#ffffff"};
+        case ThemeMode::Mint: return {"#edf7f4", "#ffffff", "#f5fbf9", "#dcefe9", "#c8e2d9", "#21866d", "#18352e", "#4d766a", "#83a69b", "#21866d", "#43a889", "#ffffff"};
+        case ThemeMode::Rose: return {"#faf2f4", "#ffffff", "#fdf8f9", "#f2e3e8", "#e8d1da", "#a34d6d", "#38212b", "#765767", "#a58a97", "#a34d6d", "#c47491", "#ffffff"};
+        case ThemeMode::WarmSand: return {"#f8f4eb", "#fffdf8", "#fcf9f2", "#eee5d3", "#dfd2b9", "#96713b", "#352d21", "#76664d", "#a99b84", "#96713b", "#c18b42", "#ffffff"};
+        case ThemeMode::Twilight: return {"#f1f2f9", "#ffffff", "#f8f8fc", "#e4e5f1", "#d1d3e5", "#555f9c", "#24263d", "#5c607c", "#888ba5", "#555f9c", "#7b83c0", "#ffffff"};
+        case ThemeMode::LightSage:
+        default: return {"#eef3eb", "#ffffff", "#f7faf5", "#e5ede2", "#d8e3d3", "#3a5a40", "#1a2e1d", "#52796f", "#84a98c", "#344e41", "#588157", "#ffffff"};
+        }
+    }
+
+    inline QString themeName(ThemeMode mode) {
+        switch (mode) {
+        case ThemeMode::Lavender: return QStringLiteral("优雅薰衣草");
+        case ThemeMode::NordicBlue: return QStringLiteral("冰川静蓝");
+        case ThemeMode::SummerMeadow: return QStringLiteral("夏日草甸");
+        case ThemeMode::ClassicWhite: return QStringLiteral("经典白色 (MATLAB)");
+        case ThemeMode::DeepSlate: return QStringLiteral("深邃蓝灰");
+        case ThemeMode::Mint: return QStringLiteral("海盐薄荷");
+        case ThemeMode::Rose: return QStringLiteral("樱雾玫瑰");
+        case ThemeMode::WarmSand: return QStringLiteral("暖阳砂岩");
+        case ThemeMode::Twilight: return QStringLiteral("暮色靛蓝");
+        default: return QStringLiteral("清爽米绿");
+        }
+    }
+
+    inline QString getThemeStyle(ThemeMode mode) {
+        const auto c = themeColors(mode);
+        return QString(R"(
+            QWidget { background-color:%1; color:%2; font-family:'Segoe UI','Microsoft YaHei',sans-serif; font-size:10pt; }
+            QMainWindow,QDialog { background-color:%1; }
+            QMenuBar,QToolBar,QStatusBar { background-color:%4; color:%2; border:0; }
+            QMenu { background-color:%3; color:%2; border:1px solid %5; padding:4px; }
+            QMenu::item { padding:6px 22px; } QMenu::item:selected { background-color:%10; color:%11; }
+            QGroupBox { border:1px solid %5; border-radius:6px; margin-top:18px; padding-top:8px; font-weight:600; }
+            QGroupBox::title { color:%10; subcontrol-origin:margin; left:10px; padding:0 4px; }
+            QLineEdit,QSpinBox,QDoubleSpinBox,QComboBox,QTextEdit,QPlainTextEdit { background-color:%3; color:%2; border:1px solid %5; border-radius:4px; padding:4px 7px; selection-background-color:%10; }
+            QLineEdit:focus,QSpinBox:focus,QDoubleSpinBox:focus,QComboBox:focus,QTextEdit:focus { border:1px solid %6; }
+            QPushButton,QToolButton { background-color:%4; color:%2; border:1px solid %5; border-radius:5px; padding:6px 12px; }
+            QPushButton:hover,QToolButton:hover { background-color:%7; } QPushButton:pressed,QToolButton:pressed { background-color:%3; }
+            QPushButton#btnPrimary { background-color:%10; color:%11; border-color:%6; font-weight:bold; }
+            QPushButton#btnPrimary:hover { background-color:%6; }
+            QPushButton#btnPrimary:pressed { background-color:%10; }
+            QPushButton#btnPrimary:disabled { background-color:%4; color:%9; border-color:%5; }
+            QTabWidget::pane { background-color:%3; border:1px solid %5; }
+            QTabBar::tab { background-color:%4; color:%8; padding:8px 16px; margin-right:2px; }
+            QTabBar::tab:selected { background-color:%3; color:%10; border-bottom:2px solid %10; }
+            QLabel#sectionInfo { background-color:%7; color:%2; border:1px solid %5; border-left:4px solid %10; border-radius:6px; padding:9px 12px; font-weight:600; }
+            QDockWidget { color:%2; } QDockWidget::title { background:%4; padding:6px; border-bottom:1px solid %5; }
+            QMainWindow::separator { background:%5; width:3px; height:3px; }
+            QScrollBar:vertical { background:%1; width:9px; } QScrollBar::handle:vertical { background:%5; min-height:20px; border-radius:4px; }
+        )").arg(c.bgApp, c.text, c.bgCard, c.bgHeader, c.border, c.focus, c.bgHover, c.textSecondary, c.textMuted, c.primary, c.buttonText);
+    }
+
     // 现代深色地学分析风格主题 (Slate Deep Blue Theme)
     inline QString getDarkScientificStyle() {
         return R"(
