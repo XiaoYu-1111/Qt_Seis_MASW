@@ -21,13 +21,13 @@
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <UseDebugLibraries>true</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
-    <PlatformToolset>v145</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <UseDebugLibraries>false</UseDebugLibraries>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
@@ -79,6 +79,10 @@
       <AdditionalOptions>/bigobj %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>D:\CPP_lib\AI_onnxruntime_cpu\onnxruntime-win-x64-1.30.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
+    <Link>
+      <AdditionalDependencies>onnxruntime.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>D:\CPP_lib\AI_onnxruntime_cpu\onnxruntime-win-x64-1.30.0\lib;</AdditionalLibraryDirectories>
+    </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
     <ClCompile>
@@ -137,6 +141,9 @@
     <ClInclude Include="style.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="..\..\..\..\..\Data file\地质模型model\elastic-marmousi-model\model\marmous_1.25m\MODEL_resample_2.5m_A_0_2266_rho.sgy" />
+    <None Include="..\..\..\..\..\Data file\地质模型model\elastic-marmousi-model\model\marmous_1.25m\MODEL_resample_2.5m_A_0_2266_vp.sgy" />
+    <None Include="..\..\..\..\..\Data file\地质模型model\elastic-marmousi-model\model\marmous_1.25m\MODEL_resample_2.5m_A_0_2266_vs.sgy" />
     <None Include="Python_script\02_plot_dispersion_map.py" />
     <None Include="Python_script\01_plot_seismic_gather.py" />
     <None Include="Python_script\run_inversion.py" />

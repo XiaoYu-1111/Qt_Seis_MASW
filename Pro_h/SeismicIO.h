@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstring>
 #include <algorithm>
+#include <QString>
 
 #include <Eigen/Dense>     // 矩阵运算
 #ifndef M_PI
@@ -15,7 +16,7 @@
 namespace SeismicIO {
 
     // SEGY 读取
-    std::vector<std::vector<float>> readSegyFile2D(std::string inputfile);
+    std::vector<std::vector<float>> readSegyFile2D(const QString& inputfile);
 
     // SEGY 写入
     // 支持直接从 2D vector 写入，或者从展平的 1D vector (通过重载实现) 写入

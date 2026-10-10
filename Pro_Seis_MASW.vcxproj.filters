@@ -115,5 +115,8 @@
     <None Include="Python_script\run_inversion.py">
       <Filter>Python_script</Filter>
     </None>
+    <None Include="..\..\..\..\..\Data file\地质模型model\elastic-marmousi-model\model\marmous_1.25m\MODEL_resample_2.5m_A_0_2266_rho.sgy" />
+    <None Include="..\..\..\..\..\Data file\地质模型model\elastic-marmousi-model\model\marmous_1.25m\MODEL_resample_2.5m_A_0_2266_vp.sgy" />
+    <None Include="..\..\..\..\..\Data file\地质模型model\elastic-marmousi-model\model\marmous_1.25m\MODEL_resample_2.5m_A_0_2266_vs.sgy" />
   </ItemGroup>
 </Project>

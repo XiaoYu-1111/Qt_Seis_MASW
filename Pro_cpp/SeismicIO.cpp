@@ -1,5 +1,9 @@
 ﻿#include "Pro_h/SeismicIO.h"
 
+#include <QFile>
+#include <QDebug>
+#include <limits>
+
 namespace SeismicIO {
 
 //segy格式数据读取 IEEE IBM
@@ -36,98 +40,83 @@ namespace SeismicIO {
 		// 优化：将除法 pow(2, 24) 变为乘法
 
 		float f_mant = static_cast<float>(mantissa) * 5.96046448e-8f; // * 1.0 / pow(2, 24)
-		float result = (1.0f - 2.0f * sign) * f_mant * std::pow(16.0f, exponent - 64);
+		const float result = (1.0f - 2.0f * sign)
+			* std::ldexp(f_mant, 4 * (exponent - 64));
 
 		return result;
 	}
 	// SEGY 读取
-	std::vector<std::vector<float>> readSegyFile2D(std::string inputfile) {
-		std::ifstream filein(inputfile, std::ios::binary);
-
-		// 1. 错误检查：打开失败立即返回
-		if (!filein.is_open()) {
-			std::cerr << "Error: Cannot open file " << inputfile << std::endl;
+	std::vector<std::vector<float>> readSegyFile2D(const QString& inputfile) {
+		QFile filein(inputfile); // QFile 使用 Qt 原生 Unicode 路径处理，兼容中文目录和文件名
+		if (!filein.open(QIODevice::ReadOnly)) {
+			qWarning().noquote() << QStringLiteral("无法打开 SEGY 文件:") << inputfile << filein.errorString();
 			return {};
 		}
 
-		// 2. 读取卷头
-		// 3200字节 文本卷头 (EBCDIC or ASCII) - 暂时跳过不处理
-		filein.seekg(3200, std::ios::beg);
-
-		// 400字节 二进制卷头
-		std::vector<char> binHeader(400);
-		filein.read(binHeader.data(), 400);
-
-		// 读取采样点数 (Bytes 20-21 in binary header, i.e., index 20)
-		// 注意：SEGY 标准是大端序 (Big-Endian)
-		int16_t* pSampleCount = reinterpret_cast<int16_t*>(&binHeader[20]);
-		int trace_length = swap2byte(*pSampleCount);
-
-		// 读取数据格式代码 (Bytes 24-25 in binary header, i.e., index 24)
-		// 1 = IBM Float, 5 = IEEE Float
-		int16_t* pFormatCode = reinterpret_cast<int16_t*>(&binHeader[24]);
-		int format_code = swap2byte(*pFormatCode);
-
-		// 3. 计算道数
-		filein.seekg(0, std::ios::end);
-		long long fileSize = filein.tellg();
-		long long trace_total_bytes = 240 + 4 * static_cast<long long>(trace_length); // 道头240字节 + 数据
-		long long traces = (fileSize - 3600) / trace_total_bytes;
-
-		std::cout << "File: " << inputfile << "\n"
-			<< "Trace Length: " << trace_length << "\n"
-			<< "Total Traces: " << traces << "\n"
-			<< "Format Code: " << format_code << (format_code == 1 ? " (IBM)" : (format_code == 5 ? " (IEEE)" : " (Unknown)"))
-			<< std::endl;
-
-		if (traces <= 0 || trace_length <= 0) {
-			std::cerr << "Error: Invalid trace count or length." << std::endl;
+		constexpr qint64 dataOffset = 3600;
+		constexpr qint64 traceHeaderBytes = 240;
+		if (filein.size() < dataOffset || !filein.seek(3200)) {
+			qWarning().noquote() << QStringLiteral("SEGY 文件头不完整:") << inputfile;
 			return {};
 		}
 
-		// 4. 读取数据
-		filein.seekg(3600, std::ios::beg); // 跳回第一道开始处
+		const QByteArray binHeader = filein.read(400);
+		if (binHeader.size() != 400) {
+			qWarning().noquote() << QStringLiteral("读取 SEGY 二进制卷头失败:") << inputfile;
+			return {};
+		}
 
-		// 预分配内存，避免 vector 动态扩容
-		std::vector<std::vector<float>> dataArray(traces, std::vector<float>(trace_length));
+		// memcpy 避免直接解引用非对齐的卷头地址。
+		int16_t sampleCountBE = 0;
+		int16_t formatCodeBE = 0;
+		std::memcpy(&sampleCountBE, binHeader.constData() + 20, sizeof(sampleCountBE));
+		std::memcpy(&formatCodeBE, binHeader.constData() + 24, sizeof(formatCodeBE));
+		const int traceLength = swap2byte(sampleCountBE);
+		const int formatCode = swap2byte(formatCodeBE);
+		if (traceLength <= 0 || (formatCode != 1 && formatCode != 5)) {
+			qWarning().noquote() << QStringLiteral("SEGY 采样点数或格式不受支持:") << inputfile
+				<< QStringLiteral("采样点数:") << traceLength << QStringLiteral("格式:") << formatCode;
+			return {};
+		}
 
-		// 缓冲区：每次读取一道的数据部分 (4 bytes * length)
-		// 道头 240 字节
-		std::vector<char> traceHeader(240);
-		std::vector<uint32_t> rawData(trace_length);
+		const qint64 traceBytes = traceHeaderBytes + 4LL * traceLength;
+		const qint64 dataBytes = filein.size() - dataOffset;
+		const qint64 traceCount = dataBytes / traceBytes;
+		if (traceCount <= 0 || traceCount > std::numeric_limits<int>::max()) {
+			qWarning().noquote() << QStringLiteral("SEGY 道数无效:") << inputfile << traceCount;
+			return {};
+		}
+		if (dataBytes % traceBytes != 0)
+			qWarning().noquote() << QStringLiteral("SEGY 末尾存在不完整道数据，忽略尾部字节:") << inputfile;
 
-		for (int i = 0; i < traces; i++) {
-			if (i % 10000 == 0 && i > 0) std::cout << "Reading trace: " << i << std::endl;
+		std::vector<std::vector<float>> dataArray;
+		dataArray.reserve(static_cast<size_t>(traceCount));
+		std::vector<char> traceBuffer(static_cast<size_t>(traceBytes));
+		if (!filein.seek(dataOffset)) return {};
 
-			// 读取道头和道数据
-			filein.read(traceHeader.data(), 240);
-			filein.read(reinterpret_cast<char*>(rawData.data()), trace_length * 4);
+		for (qint64 i = 0; i < traceCount; ++i) {
+			if (filein.read(traceBuffer.data(), traceBytes) != traceBytes) {
+				qWarning().noquote() << QStringLiteral("SEGY 道数据读取不完整，道号:") << (i + 1);
+				return {};
+			}
 
-			for (int j = 0; j < trace_length; j++) {
-				// SEGY 是大端序，PC 是小端序，必须交换字节
-				uint32_t val = swap4byte(rawData[j]);
-
-				if (format_code == 1) {
-					// IBM Floating Point
-					dataArray[i][j] = ibm2float(val);
-				}
-				else if (format_code == 5) {
-					// IEEE Floating Point
-					// 使用 memcpy 进行位转换，严谨且安全
-					float f_val;
-					std::memcpy(&f_val, &val, sizeof(float));
-					dataArray[i][j] = f_val;
-				}
-				else {
-					// 默认为 IEEE 或者做其他处理
-					float f_val;
-					std::memcpy(&f_val, &val, sizeof(float));
-					dataArray[i][j] = f_val;
+			dataArray.emplace_back(static_cast<size_t>(traceLength));
+			auto& trace = dataArray.back();
+			const char* sampleData = traceBuffer.data() + traceHeaderBytes;
+			for (int j = 0; j < traceLength; ++j) {
+				uint32_t rawValue = 0;
+				std::memcpy(&rawValue, sampleData + static_cast<size_t>(j) * sizeof(rawValue), sizeof(rawValue));
+				const uint32_t value = swap4byte(rawValue);
+				if (formatCode == 1) {
+					trace[j] = ibm2float(value);
+				} else {
+					std::memcpy(&trace[j], &value, sizeof(float));
 				}
 			}
 		}
 
-		filein.close();
+		qInfo().noquote() << QStringLiteral("SEGY 读取完成:") << inputfile
+			<< QStringLiteral("道数:") << traceCount << QStringLiteral("每道采样点:") << traceLength;
 		return dataArray;
 	}
 	// 保存二维数组为 SEGY 格式 (IEEE Float)

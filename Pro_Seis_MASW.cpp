@@ -10,6 +10,7 @@
 #include <QSettings>
 #include <QMenu>
 #include <QRegularExpression>
+#include <QPointer>
 
 // 辅助函数：根据名称生成 QCustomPlot 色标渐变
 static QCPColorGradient getScientificGradient(const QString& type, bool invert = false)
@@ -1379,7 +1380,7 @@ void Pro_Seis_MASW::loadSegyFile(const QString& filePath)
     textLog->append(QStringLiteral("[%1] 正在载入数据: %2").arg(timeStr).arg(filePath));
 
     // 1. 读取数据
-    m_seismicData = SeismicIO::readSegyFile2D(filePath.toStdString());
+    m_seismicData = SeismicIO::readSegyFile2D(filePath);
 
 
     if (m_seismicData.empty() || m_seismicData[0].empty()) {
@@ -2100,140 +2101,170 @@ void Pro_Seis_MASW::onStartDatasetGeneration()
 
 void Pro_Seis_MASW::onAiPickClicked()
 {
-    // 1. 基础有效性检查
     if (m_rawDispersionEnergy.empty() || m_dispNf <= 0 || m_dispNv <= 0) {
         QMessageBox::warning(this, QStringLiteral("提示"), QStringLiteral("请先计算或载入频散能量谱！"));
         return;
     }
 
-    // 自动寻找模型路径 (支持开发环境与最终打包环境)
-    QString modelPath = QCoreApplication::applicationDirPath() + "/models/dispersion_picker.onnx";
-    if (!QFile::exists(modelPath)) {
-        // 开发备选路径
-        modelPath = QCoreApplication::applicationDirPath() + "/../../Pro_Seis_MASW/models/dispersion_picker.onnx";
+    // 保证传入网络的数据确实与频散网格尺寸一致，避免后续越界。
+    if (static_cast<int>(m_rawDispersionEnergy.size()) != m_dispNv) {
+        QMessageBox::critical(this, QStringLiteral("频散数据异常"), QStringLiteral("频散数据行数与速度网格不一致，请重新计算频散谱。"));
+        return;
     }
+    for (const auto& row : m_rawDispersionEnergy) {
+        if (static_cast<int>(row.size()) != m_dispNf) {
+            QMessageBox::critical(this, QStringLiteral("频散数据异常"), QStringLiteral("频散数据列数与频率网格不一致，请重新计算频散谱。"));
+            return;
+        }
+    }
+
+    QString modelPath = QCoreApplication::applicationDirPath() + "/models/dispersion_ridge_net_best.onnx";
+    if (!QFile::exists(modelPath))
+        modelPath = QDir::cleanPath(QCoreApplication::applicationDirPath() + "/../../Pro_Seis_MASW/models/dispersion_ridge_net_best.onnx");
     if (!QFile::exists(modelPath)) {
-        modelPath = QFileDialog::getOpenFileName(this, QStringLiteral("定位 AI 模型文件"), "", "ONNX Model (*.onnx)");
+        modelPath = QFileDialog::getOpenFileName(this, QStringLiteral("定位 AI 模型文件"),
+            QCoreApplication::applicationDirPath(), QStringLiteral("ONNX 模型 (*.onnx)"));
         if (modelPath.isEmpty()) return;
     }
+    modelPath = QFileInfo(modelPath).absoluteFilePath();
+
+    if (!btnAiPick || !btnAiPick->isEnabled()) return;
+
+    const int nv = m_dispNv;
+    const int nf = m_dispNf;
+    const std::vector<int64_t> inputDims = { 1, 1, nv, nf };
+    std::vector<float> inputValues(static_cast<size_t>(nv) * nf);
+    for (int vi = 0; vi < nv; ++vi)
+        std::copy(m_rawDispersionEnergy[vi].cbegin(), m_rawDispersionEnergy[vi].cend(), inputValues.begin() + static_cast<size_t>(vi) * nf);
+
+    const double fMin = m_dispFmin;
+    const double fMax = m_dispFmax;
+    const double vMin = m_dispVmin;
+    const double vMax = m_dispVmax;
+    const QPointer<Pro_Seis_MASW> guardedThis(this);
 
     textLog->append(QStringLiteral("[%1] 启动 AI 智能脊线推理...")
         .arg(QDateTime::currentDateTime().toString("hh:mm:ss")));
+    textLog->append(QStringLiteral("[%1] ONNX 模型: %2").arg(QDateTime::currentDateTime().toString("hh:mm:ss"), modelPath));
+    btnAiPick->setEnabled(false);
+    btnAiPick->setText(QStringLiteral("⏳ AI 正在识别…"));
 
-    try {
-        // =========================================================
-        // 2. 初始化 ONNX Runtime 推理会话 (纯 CPU 极速推理)
-        // =========================================================
-        Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "MASW_AI_Picker");
-        Ort::SessionOptions sessionOptions;
-        sessionOptions.SetIntraOpNumThreads(4); // 开启 4 线程加速
-        sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
+    QThread* worker = QThread::create([guardedThis, modelPath, nv, nf, inputDims, inputValues = std::move(inputValues), fMin, fMax, vMin, vMax]() mutable {
+        try {
+            Ort::Env env(ORT_LOGGING_LEVEL_WARNING, "MASW_AI_Picker");
+            Ort::SessionOptions sessionOptions;
+            sessionOptions.SetIntraOpNumThreads(4);
+            sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_ALL);
 
-        // Windows 下使用宽字符路径加载
-        std::wstring wModelPath = modelPath.toStdWString();
-        Ort::Session session(env, wModelPath.c_str(), sessionOptions);
+            const std::wstring wideModelPath = modelPath.toStdWString();
+            Ort::Session session(env, wideModelPath.c_str(), sessionOptions);
+            if (session.GetInputCount() != 1 || session.GetOutputCount() != 1)
+                throw std::runtime_error("模型必须包含一个输入节点和一个输出节点。");
 
-        // =========================================================
-        // 3. 构建模型输入张量 [1, 1, Nv, Nf]
-        // =========================================================
-        int nv = m_dispNv; // 250
-        int nf = m_dispNf; // 180
+            Ort::AllocatorWithDefaultOptions allocator;
+            auto inputNameAllocated = session.GetInputNameAllocated(0, allocator);
+            auto outputNameAllocated = session.GetOutputNameAllocated(0, allocator);
+            const std::string inputName(inputNameAllocated.get());
+            const std::string outputName(outputNameAllocated.get());
 
-        // 提取当前界面归一化后的数据并展平为一维数组 (行优先)
-        std::vector<float> inputTensorValues;
-        inputTensorValues.reserve(nv * nf);
+            const auto inputInfo = session.GetInputTypeInfo(0).GetTensorTypeAndShapeInfo();
+            if (inputInfo.GetElementType() != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT)
+                throw std::runtime_error("模型输入类型不是 float32。");
+            const auto modelInputShape = inputInfo.GetShape();
+            if (modelInputShape.size() != inputDims.size())
+                throw std::runtime_error("模型输入不是 [1, 1, Nv, Nf] 四维张量。");
+            for (size_t i = 0; i < modelInputShape.size(); ++i) {
+                if (modelInputShape[i] > 0 && modelInputShape[i] != inputDims[i])
+                    throw std::runtime_error("当前频散网格尺寸与 ONNX 模型输入尺寸不匹配。");
+            }
 
-        // 按照 Python 端一样的每列归一化标准送入
-        for (int vi = 0; vi < nv; ++vi) {
+            auto memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
+            Ort::Value inputTensor = Ort::Value::CreateTensor<float>(memoryInfo, inputValues.data(),
+                inputValues.size(), inputDims.data(), inputDims.size());
+            const char* inputNames[] = { inputName.c_str() };
+            const char* outputNames[] = { outputName.c_str() };
+
+            QElapsedTimer timer;
+            timer.start();
+            auto outputTensors = session.Run(Ort::RunOptions{ nullptr }, inputNames, &inputTensor, 1, outputNames, 1);
+            const qint64 elapsedMs = timer.elapsed();
+            if (outputTensors.size() != 1 || !outputTensors.front().IsTensor())
+                throw std::runtime_error("模型没有返回有效的输出张量。");
+            const auto outputInfo = outputTensors.front().GetTensorTypeAndShapeInfo();
+            const size_t expectedElements = static_cast<size_t>(nv) * nf;
+            if (outputInfo.GetElementType() != ONNX_TENSOR_ELEMENT_DATA_TYPE_FLOAT ||
+                outputInfo.GetElementCount() != expectedElements)
+                throw std::runtime_error("模型输出尺寸与当前频散网格不一致，已中止拾取以避免越界。");
+
+            const float* probMatrix = outputTensors.front().GetTensorData<float>();
+            QVector<QPointF> pickedPoints;
+            pickedPoints.reserve(nf);
+            const double df = (fMax - fMin) / std::max(1, nf - 1);
+            const double dv = (vMax - vMin) / std::max(1, nv - 1);
+
             for (int fi = 0; fi < nf; ++fi) {
-                inputTensorValues.push_back(m_rawDispersionEnergy[vi][fi]);
-            }
-        }
-
-        std::vector<int64_t> inputDims = { 1, 1, nv, nf };
-        auto memoryInfo = Ort::MemoryInfo::CreateCpu(OrtArenaAllocator, OrtMemTypeDefault);
-
-        Ort::Value inputTensor = Ort::Value::CreateTensor<float>(
-            memoryInfo, inputTensorValues.data(), inputTensorValues.size(),
-            inputDims.data(), inputDims.size()
-        );
-
-        const char* inputNames[] = { "input" };
-        const char* outputNames[] = { "output" };
-
-        // =========================================================
-        // 4. 执行前向推理
-        // =========================================================
-        QElapsedTimer timer;
-        timer.start();
-
-        auto outputTensors = session.Run(
-            Ort::RunOptions{ nullptr }, inputNames, &inputTensor, 1, outputNames, 1
-        );
-
-        qint64 elapsedMs = timer.elapsed();
-
-        // 获取输出指针 (概率矩阵: 形状同为 [nv, nf])
-        float* probMatrix = outputTensors.front().GetTensorMutableData<float>();
-
-        // =========================================================
-        // 5. 后处理：加权质心法提取亚像素 1D 频散曲线坐标
-        // =========================================================
-        m_pickedPoints.clear();
-        double df = (m_dispFmax - m_dispFmin) / std::max(1, nf - 1);
-        double dv = (m_dispVmax - m_dispVmin) / std::max(1, nv - 1);
-
-        for (int fi = 0; fi < nf; ++fi) {
-            // 找到当前列概率最大的点
-            int maxVi = 0;
-            float maxProb = -1.0f;
-            for (int vi = 0; vi < nv; ++vi) {
-                float p = probMatrix[vi * nf + fi];
-                if (p > maxProb) {
-                    maxProb = p;
-                    maxVi = vi;
+                int maxVi = 0;
+                float maxProb = -std::numeric_limits<float>::infinity();
+                for (int vi = 0; vi < nv; ++vi) {
+                    const float probability = probMatrix[static_cast<size_t>(vi) * nf + fi];
+                    if (std::isfinite(probability) && probability > maxProb) {
+                        maxProb = probability;
+                        maxVi = vi;
+                    }
                 }
+
+                const int viStart = std::max(0, maxVi - 3);
+                const int viEnd = std::min(nv - 1, maxVi + 3);
+                double weightSum = 0.0;
+                double idxWeightedSum = 0.0;
+                for (int vi = viStart; vi <= viEnd; ++vi) {
+                    const double weight = std::max(0.0f, probMatrix[static_cast<size_t>(vi) * nf + fi]);
+                    weightSum += weight;
+                    idxWeightedSum += vi * weight;
+                }
+                const double subPixelVi = weightSum > 1e-4 ? idxWeightedSum / weightSum : maxVi;
+                pickedPoints.append(QPointF(fMin + fi * df, vMin + subPixelVi * dv));
             }
 
-            // 局部质心平滑 (取峰值上下各 3 个像素)
-            int viStart = std::max(0, maxVi - 3);
-            int viEnd = std::min(nv - 1, maxVi + 3);
-            double weightSum = 0.0;
-            double idxWeightedSum = 0.0;
-
-            for (int vi = viStart; vi <= viEnd; ++vi) {
-                double w = probMatrix[vi * nf + fi];
-                weightSum += w;
-                idxWeightedSum += vi * w;
-            }
-
-            double subPixelVi = (weightSum > 1e-4) ? (idxWeightedSum / weightSum) : maxVi;
-
-            // 换算为物理坐标
-            double freq = m_dispFmin + fi * df;
-            double vel = m_dispVmin + subPixelVi * dv;
-
-            m_pickedPoints.append(QPointF(freq, vel));
+            if (!guardedThis) return;
+            QMetaObject::invokeMethod(guardedThis.data(), [guardedThis, pickedPoints = std::move(pickedPoints), elapsedMs]() {
+                if (!guardedThis) return;
+                guardedThis->m_pickedPoints = pickedPoints;
+                guardedThis->updatePickVisuals();
+                guardedThis->btnAiPick->setEnabled(true);
+                guardedThis->btnAiPick->setText(QStringLiteral("🤖 AI 一键拾取"));
+                guardedThis->textLog->append(QStringLiteral("[%1] AI 频散曲线识别完成：%2 个频点，耗时 %3 ms。")
+                    .arg(QDateTime::currentDateTime().toString("hh:mm:ss")).arg(pickedPoints.size()).arg(elapsedMs));
+                QMessageBox::information(guardedThis, QStringLiteral("AI 拾取完成"),
+                    QStringLiteral("神经网络已完成全频段面波脊线提取！\n\n拾取点数：%1\n模型耗时：%2 ms\n结果已同步至曲线视图。")
+                    .arg(pickedPoints.size()).arg(elapsedMs));
+            }, Qt::QueuedConnection);
         }
-
-        // =========================================================
-        // 6. 实时同步更新两处视图
-        // =========================================================
-        updatePickVisuals();
-
-        textLog->append(QStringLiteral("[%1] 🤖 AI 频散曲线自动识别完成！共拾取 %2 个频点，推理耗时: %3 ms。")
-            .arg(QDateTime::currentDateTime().toString("hh:mm:ss"))
-            .arg(m_pickedPoints.size())
-            .arg(elapsedMs));
-
-        QMessageBox::information(this, QStringLiteral("AI 拾取完成"),
-            QStringLiteral("神经网络已完成全频段面波脊线提取！\n\n- 拾取点数: %1 点\n- 模型耗时: %2 ms\n- 结果已同步至 Tab 2 与 Tab 3。")
-            .arg(m_pickedPoints.size()).arg(elapsedMs));
-
-    }
-    catch (const std::exception& e) {
-        QMessageBox::critical(this, QStringLiteral("ONNX 推理异常"), QString::fromLocal8Bit(e.what()));
-    }
+        catch (const Ort::Exception& e) {
+            const QString error = QString::fromUtf8(e.what());
+            if (!guardedThis) return;
+            QMetaObject::invokeMethod(guardedThis.data(), [guardedThis, error]() {
+                if (!guardedThis) return;
+                guardedThis->btnAiPick->setEnabled(true);
+                guardedThis->btnAiPick->setText(QStringLiteral("🤖 AI 一键拾取"));
+                guardedThis->textLog->append(QStringLiteral("ONNX 加载/推理失败：%1").arg(error));
+                QMessageBox::critical(guardedThis, QStringLiteral("ONNX 加载/推理失败"), error);
+            }, Qt::QueuedConnection);
+        }
+        catch (const std::exception& e) {
+            const QString error = QString::fromUtf8(e.what());
+            if (!guardedThis) return;
+            QMetaObject::invokeMethod(guardedThis.data(), [guardedThis, error]() {
+                if (!guardedThis) return;
+                guardedThis->btnAiPick->setEnabled(true);
+                guardedThis->btnAiPick->setText(QStringLiteral("🤖 AI 一键拾取"));
+                guardedThis->textLog->append(QStringLiteral("AI 拾取失败：%1").arg(error));
+                QMessageBox::critical(guardedThis, QStringLiteral("AI 拾取失败"), error);
+            }, Qt::QueuedConnection);
+        }
+    });
+    connect(worker, &QThread::finished, worker, &QObject::deleteLater);
+    worker->start();
 }
 
 void Pro_Seis_MASW::updateCurveComparisonView()
